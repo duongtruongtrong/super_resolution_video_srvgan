@@ -38,7 +38,7 @@ Example: E:\CoderSchool_Final_Project\REDS_VTSR\Media1.mp4
 
 4 times upscale.
 
-![image](https://user-images.githubusercontent.com/71629218/99871599-94a5f300-2c0e-11eb-95be-f56564db0399.png)
+![image](https://user-images.githubusercontent.com/71629218/99871806-f450ce00-2c0f-11eb-86af-073f6b5a9545.png)
 
 ## Production - Demo:
 Build on Flask app.
