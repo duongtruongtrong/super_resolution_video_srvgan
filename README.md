@@ -15,7 +15,15 @@ Upscaling video games rendered at low resolution (e.g.: 720p) to high resolution
 
 # Project Details:
 ## Dataset:
-REalistic and Dynamic Scenes dataset for Video Temporal Super-Resolution (frame interpolation) ([REDS_VTSR](https://seungjunnah.github.io/Datasets/reds.html)) dataset includes **~70 GB** of high resolution **15-frame, 30-frame, 60-frame** videos in form of **1280 x 720** (720p) images (1 frame = 1 image).
+**RE**alistic and **D**ynamic **S**cenes dataset for **V**ideo **T**emporal **S**uper-**R**esolution (frame interpolation) ([REDS_VTSR](https://seungjunnah.github.io/Datasets/reds.html)) dataset includes **~70 GB** data:
+
+- **Strong dynamics** with **nonlinear motion**.
+- Diverse scenes and locations.
+- Provides 15, 30, 60 fps videos for the same scene.
+- High-quality, 1280×720 (HD) resolution.
+- Stored in form of images (1 frame = 1 image).
+
+Example: E:\CoderSchool_Final_Project\REDS_VTSR\Media1.mp4
 
 ## Training:
 ### GAN model:
@@ -23,12 +31,21 @@ REalistic and Dynamic Scenes dataset for Video Temporal Super-Resolution (frame 
 
 **Input**: 180p videos.
 
+- 240 training + 30 validation sequences provided (with ground-truth).
+- Tested on disjoint 30 sequences (no ground-truth provided).
+
 **Output**: 720p videos.
 
 4 times upscale.
 
-## Production:
-Upscale real time video recording.
+![image](https://user-images.githubusercontent.com/71629218/99871599-94a5f300-2c0e-11eb-95be-f56564db0399.png)
+
+## Production - Demo:
+Build on Flask app.
+
+Upscale real time video recording from webcam.
+
+![image](https://user-images.githubusercontent.com/71629218/99871713-4ba26e80-2c0f-11eb-917f-b451a08aa4ea.png)
 
 **Video frames to images**:
 https://theailearner.com/2018/10/15/extracting-and-saving-video-frames-using-opencv-python/
