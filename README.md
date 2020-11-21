@@ -15,7 +15,7 @@ Upscaling video games rendered at low resolution (e.g.: 720p) to high resolution
 
 # Project Details:
 ## Dataset:
-**RE**alistic and **D**ynamic **S**cenes dataset for **V**ideo **T**emporal **S**uper-**R**esolution (frame interpolation) ([REDS_VTSR](https://seungjunnah.github.io/Datasets/reds.html)) dataset includes **~70 GB** data:
+**RE**alistic and **D**ynamic **S**cenes dataset for **V**ideo **T**emporal **S**uper-**R**esolution (frame interpolation) ([REDS_VTSR](https://seungjunnah.github.io/Datasets/reds_vtsr)) dataset includes **~70 GB** data:
 
 - **Strong dynamics** with **nonlinear motion**.
 - Diverse scenes and locations.
