@@ -1,0 +1,37 @@
+name: srv_gan
+dependencies:
+    - python
+    - pip
+    # Core specific python
+    - numpy
+    - matplotlib
+    - seaborn
+    - beautifulsoup4
+    - pandas
+    - XlsxWriter
+    - xlwt
+    - xlrd
+    - openpyxl
+    - requests
+    - pathlib
+    # NLP
+    - nltk
+    - textblob
+    # Jupyter environment
+    - autopep8
+    - jupyterlab
+    - notebook
+    - ipython
+    - jupyter_contrib_nbextensions
+    - nbclean
+    # Autograding
+    - matplotcheck=0.0.11
+    - nbgrader
+    # Machine Learning + Deep Learning
+    - tensorflow
+    - tensorflow-gpu
+    - scikit-learn
+    - opencv
+    # Website builder
+    - streamlit
+    - Flask
