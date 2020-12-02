@@ -105,7 +105,7 @@ test_15fps_dir = [os.path.join(test_15fps_dir, p) for p in os.listdir(test_15fps
 # [train_30fps_dir, train_60fps_dir, val_30fps_dir, val_60fps_dir]
 import random
 random.shuffle(train_30fps_dir) # make the training dataset random
-random.shuffle(train_60fps_dir) # make the training dataset random
+# random.shuffle(train_60fps_dir) # make the training dataset random
 
 
 # ## 1.3. Get Image Paths
