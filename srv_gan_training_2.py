@@ -1,10 +1,7 @@
-#!/usr/bin/env python
-# coding: utf-8
 
 # # 1. Set up Directories
 
 # In[1]:
-
 
 import os
 import pathlib
@@ -14,16 +11,6 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow import keras
-
-# When running the model with conv2d
-# UnknownError:  Failed to get convolution algorithm. This is probably because cuDNN failed to initialize, so try looking to see if a warning log message was printed above.
-# it is because the cnDNN version you installed is not compatible with the cuDNN version that compiled in tensorflow. -> Let conda or pip automatically choose the right version of tensorflow and cudnn.
-# or run out of graphics card RAM -> must set limit for GPU RAM. Splitting into 2 logical GPU with different RAM limit. By default, Tensorflow will use on the logical GPU: 0, the GPU: 1 will be used for training generator and discriminator models.
-
-# gpu_devices = tf.config.experimental.list_physical_devices('GPU')
-# for device in gpu_devices:
-#     tf.config.experimental.set_memory_growth(device, True)
-
 
 # https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth
 # https://leimao.github.io/blog/TensorFlow-cuDNN-Failure/
@@ -50,68 +37,26 @@ if gpus:
 
 # In[2]:
 
-
-# train_15fps_dir = os.path.join(*['data', 'REDS_VTSR', 'train', 'train_15fps'])
-# print(train_15fps_dir)
-
 train_30fps_dir = os.path.join(*['data', 'REDS_VTSR', 'train', 'train_30fps'])
 # print(train_30fps_dir)
-
-# train_60fps_dir = os.path.join(*['data', 'REDS_VTSR', 'train', 'train_60fps'])
-# print(train_60fps_dir)
-
-# val_15fps_dir = os.path.join(*['data', 'REDS_VTSR', 'val', 'val_15fps'])
-# print(val_15fps_dir)
-
-val_30fps_dir = os.path.join(*['data', 'REDS_VTSR', 'val', 'val_30fps'])
-# print(val_30fps_dir)
-
-# val_60fps_dir = os.path.join(*['data', 'REDS_VTSR', 'val', 'val_60fps'])
-# print(val_60fps_dir)
-
-test_15fps_dir = os.path.join(*['data', 'REDS_VTSR', 'test', 'test_15fps'])
-# print(test_15fps_dir)
 
 
 # In[3]:
 
-
-# train_15fps_dir = [os.path.join(train_15fps_dir, p) for p in os.listdir(train_15fps_dir)]
-# print('Train 15fps', train_15fps_dir[:2])
-
 train_30fps_dir = [os.path.join(train_30fps_dir, p) for p in os.listdir(train_30fps_dir)]
 # print('Train 30fps', train_30fps_dir[:2])
-
-# train_60fps_dir = [os.path.join(train_60fps_dir, p) for p in os.listdir(train_60fps_dir)]
-# print('Train 60fps', train_60fps_dir[:2])
-
-# val_15fps_dir = [os.path.join(val_15fps_dir, p) for p in os.listdir(val_15fps_dir)]
-# print('Val 15fps', val_15fps_dir[:2])
-
-val_30fps_dir = [os.path.join(val_30fps_dir, p) for p in os.listdir(val_30fps_dir)]
-# print('Val 30fps', val_30fps_dir[:2])
-
-# val_60fps_dir = [os.path.join(val_60fps_dir, p) for p in os.listdir(val_60fps_dir)]
-# print('Val 60fps', val_60fps_dir[:2])
-
-test_15fps_dir = [os.path.join(test_15fps_dir, p) for p in os.listdir(test_15fps_dir)]
-# print('Val 15fps', test_15fps_dir[:2])
 
 # ## 1.2. Randomize Videos Paths
 
 # In[7]:
 
-
-# [train_30fps_dir, train_60fps_dir, val_30fps_dir, val_60fps_dir]
 import random
 random.shuffle(train_30fps_dir) # make the training dataset random
 # random.shuffle(train_60fps_dir) # make the training dataset random
 
-
 # ## 1.3. Get Image Paths
 
 # In[9]:
-
 
 train_image_30fps_paths = []
 for video_path in train_30fps_dir:
@@ -120,28 +65,7 @@ for video_path in train_30fps_dir:
 
 # output format: [image1.png, image2.png,...]
 
-
 # In[10]:
-
-
-val_image_30fps_paths = []
-for video_path in val_30fps_dir:
-    for x in os.listdir(video_path):
-        val_image_30fps_paths.append(os.path.join(video_path, x))
-
-# output format: [image1.png, image2.png,...]
-
-
-# In[11]:
-
-
-test_image_15fps_paths = []
-for video_path in test_15fps_dir:
-    for x in os.listdir(video_path):
-        test_image_15fps_paths.append(os.path.join(video_path, x))
-
-# output format: [image1.png, image2.png,...]
-
 
 # # 2. Loading Data
 
@@ -319,90 +243,12 @@ def dataset(image_paths, batch_size=2):
 
 # In[16]:
 
-
 train_dataset = dataset(train_image_30fps_paths, batch_size=2)
 # sample_train_dataset = dataset(train_image_30fps_paths[:180], batch_size=2)
 
-# ## 2.2. Validation + Test Dataset Pipeline
-
-# In[18]:
-
-
-# 1 image as 1 element
-def val_low_res(ds):
-    """
-    Function that generates a low resolution image given the high resolution image with random methods.
-    Listed methods: ['bilinear', 'lanczos3', 'lanczos5', 'bicubic', 'gaussian', 'nearest', 'area', 'mitchellcubic']
-    Default downsampling factor is 4x.
-    Args:
-        ds: A tf dataset.
-    Returns:
-        ds: A tf dataset with low and high res images.
-    """
-    method_list = ['bilinear', 'lanczos3', 'lanczos5', 'bicubic', 'gaussian', 'nearest', 'area', 'mitchellcubic']
-    downsampling_method = random.choice(method_list)
-    
-    def downsampling(high_res):
-        """
-        Function that generates a low resolution image given the high resolution image.
-        Args:
-            high_res: A tf tensor of the high res image.
-        Returns:
-            low_res: A tf tensor of the low res image.
-            high_res: A tf tensor of the high res image.
-        """
-#         print(tf.shape(high_res)[0])
-        low_res = tf.image.resize(high_res, 
-                                  [lr_height, lr_width],
-                                  preserve_aspect_ratio=True,
-                                  method=downsampling_method)   
-        return low_res
-    
-    ds = ds.map(downsampling, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    
-    return ds
-
-
-def val_dataset(image_paths, batch_size=2):
-    """
-    Returns a tf dataset object with specified mappings. No shuffle and repeat.
-    Args:
-        image_paths: Str, Path to images.
-        batch_size: Int, The number of elements in a batch returned by the dataset.
-    Returns:
-        dataset: A tf dataset object.
-    """
-    
-    # Generate tf dataset from high res video paths.
-    dataset = tf.data.Dataset.from_tensor_slices(image_paths)
-
-    # Prefetch the data for optimal GPU utilization.
-    AUTOTUNE = tf.data.experimental.AUTOTUNE
-
-    # image paths to tensor
-    dataset = dataset.map(parse_image, num_parallel_calls=AUTOTUNE)
-    
-    # Generate low resolution by downsampling.
-    dataset = dataset.apply(val_low_res)
-
-    # Batch the input, drop remainder to get a defined batch size.
-    dataset = dataset.batch(batch_size, drop_remainder=True).prefetch(AUTOTUNE)
-
-    return dataset
-
-
-# In[19]:
-
-
-val_dataset = val_dataset(val_image_30fps_paths, batch_size=2)
-# sample_val_dataset = val_dataset(val_image_30fps_paths[:90], batch_size=2)
-
-#  test_dataset = val_dataset(test_image_15fps_paths)
-
-
 # # 3. Models
 
-# ## 3.1. Generator Model
+# ## 3.1. VGG Model and Content Loss
 
 # In[20]:
 
@@ -427,7 +273,6 @@ vgg_model = tf.keras.models.Model(inputs=vgg.input, outputs=vgg.get_layer("block
 
 # In[22]:
 
-
 @tf.function
 def content_loss(hr, sr):
     """
@@ -445,171 +290,7 @@ def content_loss(hr, sr):
     mse = tf.keras.losses.MeanSquaredError()(hr_features, sr_features)
     return mse
 
-
-# In[23]:
-
-
-def build_generator():
-    """Build the generator that will do the Super Resolution task.
-    Based on the Mobilenet design. Idea from Galteri et al."""
-
-    def make_divisible(v, divisor, min_value=None):
-            if min_value is None:
-                min_value = divisor
-            new_v = max(min_value, int(v + divisor / 2) // divisor * divisor)
-            # Make sure that round down does not go down by more than 10%.
-            if new_v < 0.9 * v:
-                new_v += divisor
-            return new_v
-
-    def residual_block(inputs, filters, block_id, expansion=6, stride=1, alpha=1.0):
-        """Inverted Residual block that uses depth wise convolutions for parameter efficiency.
-        Args:
-            inputs: The input feature map.
-            filters: Number of filters in each convolution in the block.
-            block_id: An integer specifier for the id of the block in the graph.
-            expansion: Channel expansion factor.
-            stride: The stride of the convolution.
-            alpha: Depth expansion factor.
-        Returns:
-            x: The output of the inverted residual block.
-        """
-        channel_axis = 1 if keras.backend.image_data_format() == 'channels_first' else -1
-
-        in_channels = keras.backend.int_shape(inputs)[channel_axis]
-        pointwise_conv_filters = int(filters * alpha)
-        pointwise_filters = make_divisible(pointwise_conv_filters, 8)
-        x = inputs
-        prefix = 'block_{}_'.format(block_id)
-
-        if block_id:
-            # Expand
-            x = keras.layers.Conv2D(expansion * in_channels, kernel_size=1, padding='same', use_bias=True, activation=None,
-                                    name=prefix + 'expand')(x)
-            x = keras.layers.BatchNormalization(axis=channel_axis, epsilon=1e-3, momentum=0.999,
-                                                name=prefix + 'expand_BN')(x)
-            x = keras.layers.Activation('relu', name=prefix + 'expand_relu')(x)
-        else:
-            prefix = 'expanded_conv_'
-
-        # Depthwise
-        x = keras.layers.DepthwiseConv2D(kernel_size=3, strides=stride, activation=None, use_bias=True, padding='same' if stride == 1 else 'valid',
-                                         name=prefix + 'depthwise')(x)
-        x = keras.layers.BatchNormalization(axis=channel_axis, epsilon=1e-3, momentum=0.999,
-                                            name=prefix + 'depthwise_BN')(x)
-
-        x = keras.layers.Activation('relu', name=prefix + 'depthwise_relu')(x)
-
-        # Project
-        x = keras.layers.Conv2D(pointwise_filters, kernel_size=1, padding='same', use_bias=True, activation=None,
-                                name=prefix + 'project')(x)
-        x = keras.layers.BatchNormalization(axis=channel_axis, epsilon=1e-3, momentum=0.999,
-                                            name=prefix + 'project_BN')(x)
-
-        if in_channels == pointwise_filters and stride == 1:
-            return keras.layers.Add(name=prefix + 'add')([inputs, x])
-        return x
-
-    def deconv2d(layer_input):
-        """Upsampling layer to increase height and width of the input.
-        Uses PixelShuffle for upsampling.
-        Args:
-            layer_input: The input tensor to upsample.
-        Returns:
-            u: Upsampled input by a factor of 2.
-        """
-        
-        u = keras.layers.UpSampling2D(size=2, interpolation='bilinear')(layer_input)
-        
-        # Number of filters in the first layer. Realtime Image Enhancement GAN Galteri et al.
-        u = keras.layers.Conv2D(32, kernel_size=3, strides=1, padding='same')(u)
-        u = keras.layers.PReLU(shared_axes=[1, 2])(u)
-        return u
-
-    # Low resolution image input
-    img_lr = keras.Input(shape=lr_shape)
-
-    # Pre-residual block
-    c1 = keras.layers.Conv2D(32, kernel_size=3, strides=1, padding='same')(img_lr)
-    c1 = keras.layers.BatchNormalization()(c1)
-    c1 = keras.layers.PReLU(shared_axes=[1, 2])(c1)
-
-    # Propogate through residual blocks
-    r = residual_block(c1, 32, 0)
-    
-    # Number of inverted residual blocks in the mobilenet generator    
-    for idx in range(1, 6):
-        r = residual_block(r, 32, idx)
-
-    # Post-residual block
-    c2 = keras.layers.Conv2D(32, kernel_size=3, strides=1, padding='same')(r)
-    c2 = keras.layers.BatchNormalization()(c2)
-    c2 = keras.layers.Add()([c2, c1])
-
-    # Upsampling
-    u1 = deconv2d(c2)
-    u2 = deconv2d(u1)
-
-    # Generate high resolution output
-    gen_hr = keras.layers.Conv2D(3, kernel_size=3, strides=1, padding='same', activation='tanh')(u2)
-
-    return keras.models.Model(img_lr, gen_hr)
-
-
-# In[24]:
-
-gen_model = build_generator()
-
-# gen_model.summary()
-
-# ## 3.2. Discriminator Model
-
-# In[26]:
-
-
-def build_discriminator():
-    """Builds a discriminator network based on the SRGAN design."""
-
-    def d_block(layer_input, filters, strides=1, bn=True):
-        """Discriminator layer block.
-        Args:
-            layer_input: Input feature map for the convolutional block.
-            filters: Number of filters in the convolution.
-            strides: The stride of the convolution.
-            bn: Whether to use batch norm or not.
-        """
-        d = keras.layers.Conv2D(filters, kernel_size=3, strides=strides, padding='same')(layer_input)
-        if bn:
-            d = keras.layers.BatchNormalization(momentum=0.8)(d)
-        d = keras.layers.LeakyReLU(alpha=0.2)(d)
-
-        return d
-
-    # Input img
-    d0 = keras.layers.Input(shape=hr_shape)
-
-    d1 = d_block(d0, 32, bn=False)
-    d2 = d_block(d1, 32, strides=2)
-    d3 = d_block(d2, 32)
-    d4 = d_block(d3, 32, strides=2)
-    d5 = d_block(d4, 64)
-    d6 = d_block(d5, 64, strides=2)
-    d7 = d_block(d6, 64)
-    d8 = d_block(d7, 64, strides=2)
-
-    validity = keras.layers.Conv2D(1, kernel_size=1, strides=1, activation='sigmoid', padding='same')(d8)
-
-    return keras.models.Model(d0, validity)
-
-
-# In[27]:
-
-
-disc_model = build_discriminator()
-# disc_model.summary()
-
-
-# ## 3.3. Optimizers
+# ## 3.2. Optimizers
 
 # In[28]:
 
@@ -634,7 +315,6 @@ disc_schedule = keras.optimizers.schedules.ExponentialDecay(
 gen_optimizer = keras.optimizers.Adam(learning_rate=gen_schedule)
 disc_optimizer = keras.optimizers.Adam(learning_rate=disc_schedule)
 
-
 # # 4. Training
 
 # In[29]:
@@ -652,9 +332,7 @@ disc_patch = (height_patch, width_patch, 1)
 pretrain_iteration = 1
 train_iteration = 1
 
-
 # In[30]:
-
 
 @tf.function
 def pretrain_step(gen_model, x, y):
@@ -777,35 +455,28 @@ def train(gen_model, disc_model, dataset, writer, log_iter=200):
                 tf.summary.image('Low Res', tf.cast(255 * x, tf.uint8), step=train_iteration)
                 tf.summary.image('High Res', tf.cast(255 * (y + 1.0) / 2.0, tf.uint8), step=train_iteration)
                 tf.summary.image('Generated', tf.cast(255 * (gen_model.predict(x) + 1.0) / 2.0, tf.uint8), step=train_iteration)
-                gen_model.save('models/generator.h5')
-                disc_model.save('models/discriminator.h5')
+                gen_model.save('models/generator_2.h5')
+                disc_model.save('models/discriminator_2.h5')
                 writer.flush()
             train_iteration += 1
 
+# ============================================================
+# Load pretrain models (generator.h5 and disc_model)
 
-# In[31]:
-
-# New Training
-
-# utilize the multiple GPUs
-# strategy = tf.distribute.MirroredStrategy()
-# with strategy.scope():
-    
 with tf.device('/device:GPU:1'):
-    # Define the directory for saving pretrainig loss tensorboard summary.
-    pretrain_summary_writer = tf.summary.create_file_writer('logs/pretrain')
 
-    # Run pre-training.
 #     sample_train_dataset
 #     train_dataset
-    pretrain_generator(gen_model, train_dataset, pretrain_summary_writer)
-    gen_model.save('models/generator.h5')
+    # Recreate the exact same model, including its weights and the optimizer
+    gen_model = tf.keras.models.load_model('models/generator_2.h5')
+
+    # Recreate the exact same model, including its weights and the optimizer
+    disc_model = tf.keras.models.load_model('models/discriminator_2.h5')
     
     # Define the directory for saving the SRGAN training tensorbaord summary.
-    train_summary_writer = tf.summary.create_file_writer('logs/train')
+    train_summary_writer = tf.summary.create_file_writer('logs_2/train')
 
-    epochs = 2
-    # speed: 45 min/epoch
+    epochs = 16
 
     # Run training.
     for _ in range(epochs):
@@ -813,6 +484,6 @@ with tf.device('/device:GPU:1'):
         print(f'Epoch: {_}\n')
         
         train(gen_model, disc_model, train_dataset, train_summary_writer, log_iter=200)
-        
+
 # import os
-# os.system('shutdown /p /f')
+os.system('shutdown /p /f')
