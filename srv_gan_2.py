@@ -512,7 +512,7 @@ def build_generator():
 
     def deconv2d(layer_input):
         """Upsampling layer to increase height and width of the input.
-        Uses PixelShuffle for upsampling.
+        Uses UpSampling2D for upsampling.
         Args:
             layer_input: The input tensor to upsample.
         Returns:
