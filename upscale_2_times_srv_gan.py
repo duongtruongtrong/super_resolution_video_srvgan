@@ -319,10 +319,6 @@ def dataset(image_paths, batch_size=2):
 
 # In[16]:
 
-
-train_dataset = dataset(train_image_30fps_paths, batch_size=2)
-# sample_train_dataset = dataset(train_image_30fps_paths[:180], batch_size=2)
-
 # ## 2.2. Validation + Test Dataset Pipeline
 
 # In[18]:
@@ -512,7 +508,7 @@ def build_generator():
 
     def deconv2d(layer_input):
         """Upsampling layer to increase height and width of the input.
-        Uses PixelShuffle for upsampling.
+        Uses Conv2DTranspose for upsampling.
         Args:
             layer_input: The input tensor to upsample.
         Returns:
@@ -772,9 +768,12 @@ def train(gen_model, disc_model, dataset, writer, log_iter=200):
                 tf.summary.scalar('Content Loss', cont_loss, step=train_iteration)
                 tf.summary.scalar('MSE Loss', mse_loss, step=train_iteration)
                 tf.summary.scalar('Discriminator Loss', disc_loss, step=train_iteration)
-                tf.summary.image('Low Res', tf.cast(255 * x, tf.uint8), step=train_iteration)
-                tf.summary.image('High Res', tf.cast(255 * (y + 1.0) / 2.0, tf.uint8), step=train_iteration)
-                tf.summary.image('Generated', tf.cast(255 * (gen_model.predict(x) + 1.0) / 2.0, tf.uint8), step=train_iteration)
+
+                if train_iteration % 10000 == 0:
+                    tf.summary.image('Low Res', tf.cast(255 * x, tf.uint8), step=train_iteration)
+                    tf.summary.image('High Res', tf.cast(255 * (y + 1.0) / 2.0, tf.uint8), step=train_iteration)
+                    tf.summary.image('Generated', tf.cast(255 * (gen_model.predict(x) + 1.0) / 2.0, tf.uint8), step=train_iteration)
+                    
                 gen_model.save('models/generator_upscale_2_times.h5')
                 disc_model.save('models/discriminator_upscale_2_times.h5')
                 writer.flush()
@@ -790,8 +789,14 @@ def train(gen_model, disc_model, dataset, writer, log_iter=200):
 # with strategy.scope():
     
 with tf.device('/device:GPU:1'):
+
     # Define the directory for saving pretrainig loss tensorboard summary.
     pretrain_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/pretrain')
+
+    batch_size = 2
+
+    train_dataset = dataset(train_image_30fps_paths, batch_size=batch_size)
+    # sample_train_dataset = dataset(train_image_30fps_paths[:180], batch_size=batch_size)
 
     # Run pre-training.
 #     sample_train_dataset
@@ -802,13 +807,18 @@ with tf.device('/device:GPU:1'):
     # Define the directory for saving the SRGAN training tensorbaord summary.
     train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
-    epochs = 8
-    # speed: 54 min/epoch
+    epochs = 2
+    # speed: 55 min/epoch
 
     # Run training.
     for _ in range(epochs):
         print('===================')
         print(f'Epoch: {_}\n')
+
+        # recreate dataset every epoch to lightly augment the frames. ".repeat()" in dataset pipeline function does not help.
+
+        train_dataset = dataset(train_image_30fps_paths, batch_size=batch_size)
+        # sample_train_dataset = dataset(train_image_30fps_paths[:180], batch_size=batch_size)
         
         train(gen_model, disc_model, train_dataset, train_summary_writer, log_iter=200)
         

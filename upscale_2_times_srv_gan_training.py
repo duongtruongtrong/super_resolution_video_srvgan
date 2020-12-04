@@ -243,9 +243,6 @@ def dataset(image_paths, batch_size=2):
 
 # In[16]:
 
-train_dataset = dataset(train_image_30fps_paths, batch_size=2)
-# sample_train_dataset = dataset(train_image_30fps_paths[:180], batch_size=2)
-
 # # 3. Models
 
 # ## 3.1. VGG Model and Content Loss
@@ -296,7 +293,7 @@ def content_loss(hr, sr):
 
 
 # Define a learning rate decay schedule.
-lr = 1e-4
+lr = 1e-3
 
 gen_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr,
@@ -452,9 +449,12 @@ def train(gen_model, disc_model, dataset, writer, log_iter=200):
                 tf.summary.scalar('Content Loss', cont_loss, step=train_iteration)
                 tf.summary.scalar('MSE Loss', mse_loss, step=train_iteration)
                 tf.summary.scalar('Discriminator Loss', disc_loss, step=train_iteration)
-                tf.summary.image('Low Res', tf.cast(255 * x, tf.uint8), step=train_iteration)
-                tf.summary.image('High Res', tf.cast(255 * (y + 1.0) / 2.0, tf.uint8), step=train_iteration)
-                tf.summary.image('Generated', tf.cast(255 * (gen_model.predict(x) + 1.0) / 2.0, tf.uint8), step=train_iteration)
+
+                if train_iteration % 10000 == 0:
+                    tf.summary.image('Low Res', tf.cast(255 * x, tf.uint8), step=train_iteration)
+                    tf.summary.image('High Res', tf.cast(255 * (y + 1.0) / 2.0, tf.uint8), step=train_iteration)
+                    tf.summary.image('Generated', tf.cast(255 * (gen_model.predict(x) + 1.0) / 2.0, tf.uint8), step=train_iteration)
+
                 gen_model.save('models/generator_upscale_2_times.h5')
                 disc_model.save('models/discriminator_upscale_2_times.h5')
                 writer.flush()
@@ -476,13 +476,20 @@ with tf.device('/device:GPU:1'):
     # Define the directory for saving the SRGAN training tensorbaord summary.
     train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
-    epochs = 8
-    # speed: 54 min/epoch
+    epochs = 2
+    # speed: 55 min/epoch
+
+    batch_size = 2
 
     # Run training.
     for _ in range(epochs):
         print('===================')
         print(f'Epoch: {_}\n')
+        
+        # recreate dataset every epoch to lightly augment the frames. ".repeat()" in dataset pipeline function does not help.
+
+        train_dataset = dataset(train_image_30fps_paths, batch_size=batch_size)
+        # sample_train_dataset = dataset(train_image_30fps_paths[:180], batch_size=batch_size)
         
         train(gen_model, disc_model, train_dataset, train_summary_writer, log_iter=200)
 
