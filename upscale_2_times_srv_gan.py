@@ -197,17 +197,57 @@ def parse_image(image_path):
 
     return image
 
-def random_crop(image):
+def random_crop_resize(ds):
     """
-    Function that randomly crop image to desired resolution to produce high_res image.
+    Function that randomly crop or resize image to desired resolution to produce high_res image.
     Args:
-        image: A tf tensor of the loaded frames.
+        ds: A tf dataset.
     Returns:
-        image: A tf tensor of the loaded frames.
+        ds: A tf dataset with cropped or resized frames.
     """
-    high_res = tf.image.random_crop(image, [hr_height, hr_width, 3])
+    method_list = ['crop', 'resize']
+    crop_resize_method = random.choice(method_list)
 
-    return high_res
+    def random_crop(image):
+        """
+        Function that randomly crop image to desired resolution to produce high_res image.
+        Args:
+            image: A tf tensor of the loaded frames.
+        Returns:
+            image: A tf tensor of cropped frames.
+        """
+        image = tf.image.random_crop(image, [hr_height, hr_width, 3])
+
+        return image
+    
+    method_list = ['bilinear', 'gaussian', 'nearest', 'area']
+    downsampling_method = random.choice(method_list)
+
+    def downsampling(image):
+        """
+        Function that resize image to desired resolution.
+        Downsampling methods: ['bilinear', 'gaussian', 'nearest', 'area']
+        Args:
+            image: A tf tensor of the loaded frames.
+        Returns:
+            image: A tf tensor of resized frames.
+        """
+#         print(tf.shape(high_res)[0])
+        image = tf.image.resize(image, 
+                                [hr_height, hr_width],
+                                preserve_aspect_ratio=True,
+                                method=downsampling_method)
+
+        return image
+
+    if crop_resize_method == 'crop':
+        # randomly crop frame
+        ds = ds.map(random_crop, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    else:
+        # downsampling frame
+        ds = ds.map(downsampling, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    return ds
 
 def flip(ds):
     """
@@ -239,16 +279,15 @@ def flip(ds):
 def high_low_res_pairs(ds):
     """
     Function that generates a low resolution image given the high resolution image with random methods.
-    Listed methods: ['bilinear', 'lanczos3', 'lanczos5', 'bicubic', 'gaussian', 'nearest', 'area', 'mitchellcubic']
-    Default downsampling factor is 4x.
+    Downsampling methods: ['bilinear', 'gaussian', 'nearest', 'area']
     Args:
         ds: A tf dataset.
     Returns:
         ds: A tf dataset with low and high res images.
     """
-    method_list = ['bilinear', 'lanczos3', 'lanczos5', 'bicubic', 'gaussian', 'nearest', 'area', 'mitchellcubic']
+    method_list = ['bilinear', 'gaussian', 'nearest', 'area']
     downsampling_method = random.choice(method_list)
-    
+
     def downsampling(high_res):
         """
         Function that generates a low resolution image given the high resolution image.
@@ -312,7 +351,7 @@ def dataset(image_paths, batch_size=2):
     dataset = dataset.map(parse_image, num_parallel_calls=AUTOTUNE)
 
     # randomly crop frame
-    dataset = dataset.map(random_crop, num_parallel_calls=AUTOTUNE)
+    dataset = dataset.apply(random_crop_resize)
 
     # randomly flip all frames in 1 video
     dataset = dataset.apply(flip)
@@ -841,11 +880,10 @@ with tf.device('/device:GPU:1'):
     train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
     epochs = 5
-    # speed: 55 min/epoch
+    # speed: 20 min/epoch
 
     # training history: 
-    # 3 epochs (first): 2.5 hours
-    # 8 epochs: 7 hours
+    # 5 epochs (first): 1 hours
     
 # Run training.
 for _ in range(epochs):
