@@ -151,8 +151,8 @@ for video_path in test_15fps_dir:
 # In[13]:
 
 
-hr_height = 360
-hr_width = 640
+hr_height = 360 // 2
+hr_width = 640 // 2
 scale = 2
 
 lr_height = hr_height // scale
@@ -196,6 +196,18 @@ def parse_image(image_path):
     image = tf.image.convert_image_dtype(image, tf.float32)
 
     return image
+
+def random_crop(image):
+    """
+    Function that randomly crop image to desired resolution to produce high_res image.
+    Args:
+        image: A tf tensor of the loaded frames.
+    Returns:
+        image: A tf tensor of the loaded frames.
+    """
+    high_res = tf.image.random_crop(image, [hr_height, hr_width, 3])
+
+    return high_res
 
 def flip(ds):
     """
@@ -251,11 +263,7 @@ def high_low_res_pairs(ds):
                                   [lr_height, lr_width],
                                   preserve_aspect_ratio=True,
                                   method=downsampling_method)
-    
-        high_res = tf.image.resize(high_res, 
-                                  [hr_height, hr_width],
-                                  preserve_aspect_ratio=True,
-                                  method=downsampling_method)
+
         return low_res, high_res
     
     ds = ds.map(downsampling, num_parallel_calls=tf.data.experimental.AUTOTUNE)
@@ -302,6 +310,9 @@ def dataset(image_paths, batch_size=2):
 
     # image paths to tensor
     dataset = dataset.map(parse_image, num_parallel_calls=AUTOTUNE)
+
+    # randomly crop frame
+    dataset = dataset.map(random_crop, num_parallel_calls=AUTOTUNE)
 
     # randomly flip all frames in 1 video
     dataset = dataset.apply(flip)
@@ -425,7 +436,7 @@ vgg_model = tf.keras.models.Model(inputs=vgg.input, outputs=vgg.get_layer("block
 
 
 @tf.function
-def content_loss(hr, sr):
+def feature_loss(hr, sr):
     """
     Returns Mean Square Error of VGG19 feature extracted original image (y) and VGG19 feature extracted generated image (y_hat).
     Args:
@@ -439,6 +450,21 @@ def content_loss(hr, sr):
     sr_features = vgg_model(sr) / 12.75
     hr_features = vgg_model(hr) / 12.75
     mse = tf.keras.losses.MeanSquaredError()(hr_features, sr_features)
+    return mse
+
+@tf.function
+def content_loss(hr, sr):
+    """
+    Returns Mean Square Error of original image (y) and generated image (y_hat).
+    Args:
+        hr: A tf tensor of original image (y)
+        sr: A tf tensor of generated image (y_hat)
+    Returns:
+        mse: Mean Square Error.
+    """
+    sr = 255.0 * (sr + 1.0) / 2.0
+    hr = 255.0 * (hr + 1.0) / 2.0
+    mse = tf.keras.losses.MeanAbsoluteError()(sr, hr)
     return mse
 
 
@@ -609,19 +635,19 @@ disc_model.summary()
 
 
 # Define a learning rate decay schedule.
-lr = 1e-4
+lr = 1e-3
 
 gen_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr,
-    decay_steps=100000,
-    decay_rate=0.1,
+    decay_steps=20000,
+    decay_rate=1e-2,
     staircase=True
 )
 
 disc_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr * 5,  # TTUR - Two Time Scale Updates
-    decay_steps=100000,
-    decay_rate=0.1,
+    decay_steps=20000,
+    decay_rate=1e-2,
     staircase=True
 )
 
@@ -633,11 +659,15 @@ disc_optimizer = keras.optimizers.Adam(learning_rate=disc_schedule)
 
 # In[29]:
 
+for layer in disc_model.layers:
+    disc_model_output_shape = layer.output_shape
+    # (None, 12, 20, 1)
+
 # 23, 40, 1
-height_patch = 23
+height_patch = disc_model_output_shape[1]
 # int(hr_height / 2 ** 4)
 
-width_patch = 40
+width_patch = disc_model_output_shape[2]
 # int(hr_width / 2 ** 4)
 
 disc_patch = (height_patch, width_patch, 1)
@@ -669,7 +699,7 @@ def pretrain_step(gen_model, x, y):
     return loss_mse
 
 
-def pretrain_generator(gen_model, dataset, writer):
+def pretrain_generator(gen_model, dataset, writer, log_iter=200):
     """Function that pretrains the generator slightly, to avoid local minima.
     Args:
         gen_model: A compiled generator model.
@@ -684,7 +714,7 @@ def pretrain_generator(gen_model, dataset, writer):
         for _ in range(1):
             for x, y in dataset:
                 loss = pretrain_step(gen_model, x, y)
-                if pretrain_iteration % 200 == 0:
+                if pretrain_iteration % log_iter == 0:
                     print(f'Pretrain Step: {pretrain_iteration}, Pretrain MSE Loss: {loss}')
                     tf.summary.scalar('MSE Loss', loss, step=tf.cast(pretrain_iteration, tf.int64))
                     writer.flush()
@@ -718,10 +748,11 @@ def train_step(gen_model, disc_model, x, y):
         fake_prediction = disc_model(fake_hr)
 #         print('disc_model')
         # Generator loss
+        feat_loss = feature_loss(y, fake_hr)
         cont_loss = content_loss(y, fake_hr)
         adv_loss = 1e-3 * tf.keras.losses.BinaryCrossentropy()(valid, fake_prediction)
         mse_loss = tf.keras.losses.MeanSquaredError()(y, fake_hr)
-        perceptual_loss = cont_loss + adv_loss + mse_loss
+        perceptual_loss = feat_loss + cont_loss + adv_loss + mse_loss
 
         # Discriminator loss
         valid_loss = tf.keras.losses.BinaryCrossentropy()(valid, valid_prediction)
@@ -739,7 +770,7 @@ def train_step(gen_model, disc_model, x, y):
     disc_optimizer.apply_gradients(zip(disc_grads, disc_model.trainable_variables))
 #     print('optimizer')
     
-    return disc_loss, adv_loss, cont_loss, mse_loss
+    return disc_loss, adv_loss, feat_loss, cont_loss, mse_loss
 
 
 def train(gen_model, disc_model, dataset, writer, log_iter=200):
@@ -758,18 +789,19 @@ def train(gen_model, disc_model, dataset, writer, log_iter=200):
     with writer.as_default():
         # Iterate over dataset
         for x, y in dataset:
-            disc_loss, adv_loss, cont_loss, mse_loss = train_step(gen_model, disc_model, x, y)
+            disc_loss, adv_loss, feat_loss, cont_loss, mse_loss = train_step(gen_model, disc_model, x, y)
 #             print(train_iteration)
             # Log tensorboard summaries if log iteration is reached.
             if train_iteration % log_iter == 0:
-                print(f'Train Step: {train_iteration}, Adversarial Loss: {adv_loss}, Content Loss: {cont_loss}, MSE Loss: {mse_loss}, Discriminator Loss: {disc_loss}')
+                print(f'Train Step: {train_iteration}, Adversarial Loss: {adv_loss}, Feature Loss: {feat_loss}, Content Loss: {cont_loss}, MSE Loss: {mse_loss}, Discriminator Loss: {disc_loss}')
                 
                 tf.summary.scalar('Adversarial Loss', adv_loss, step=train_iteration)
+                tf.summary.scalar('Feature Loss', feat_loss, step=train_iteration)
                 tf.summary.scalar('Content Loss', cont_loss, step=train_iteration)
                 tf.summary.scalar('MSE Loss', mse_loss, step=train_iteration)
                 tf.summary.scalar('Discriminator Loss', disc_loss, step=train_iteration)
 
-                if train_iteration % 10000 == 0:
+                if train_iteration % 600 == 0:
                     tf.summary.image('Low Res', tf.cast(255 * x, tf.uint8), step=train_iteration)
                     tf.summary.image('High Res', tf.cast(255 * (y + 1.0) / 2.0, tf.uint8), step=train_iteration)
                     tf.summary.image('Generated', tf.cast(255 * (gen_model.predict(x) + 1.0) / 2.0, tf.uint8), step=train_iteration)
@@ -788,38 +820,43 @@ def train(gen_model, disc_model, dataset, writer, log_iter=200):
 # strategy = tf.distribute.MirroredStrategy()
 # with strategy.scope():
     
+batch_size = 9
+
+train_dataset = dataset(train_image_30fps_paths, batch_size=batch_size)
+
 with tf.device('/device:GPU:1'):
 
     # Define the directory for saving pretrainig loss tensorboard summary.
     pretrain_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/pretrain')
-
-    batch_size = 2
-
-    train_dataset = dataset(train_image_30fps_paths, batch_size=batch_size)
+    
     # sample_train_dataset = dataset(train_image_30fps_paths[:180], batch_size=batch_size)
 
     # Run pre-training.
 #     sample_train_dataset
 #     train_dataset
-    pretrain_generator(gen_model, train_dataset, pretrain_summary_writer)
+    pretrain_generator(gen_model, train_dataset, pretrain_summary_writer, log_iter=200)
     gen_model.save('models/generator_upscale_2_times.h5')
     
     # Define the directory for saving the SRGAN training tensorbaord summary.
     train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
-    epochs = 2
+    epochs = 5
     # speed: 55 min/epoch
 
-    # Run training.
-    for _ in range(epochs):
-        print('===================')
-        print(f'Epoch: {_}\n')
+    # training history: 
+    # 3 epochs (first): 2.5 hours
+    # 8 epochs: 7 hours
+    
+# Run training.
+for _ in range(epochs):
+    print('===================')
+    print(f'Epoch: {_}\n')
 
-        # recreate dataset every epoch to lightly augment the frames. ".repeat()" in dataset pipeline function does not help.
+    # recreate dataset every epoch to lightly augment the frames. ".repeat()" in dataset pipeline function does not help.
+    train_dataset = dataset(train_image_30fps_paths, batch_size=batch_size)
+    # sample_train_dataset = dataset(train_image_30fps_paths[:180], batch_size=batch_size)
 
-        train_dataset = dataset(train_image_30fps_paths, batch_size=batch_size)
-        # sample_train_dataset = dataset(train_image_30fps_paths[:180], batch_size=batch_size)
-        
+    with tf.device('/device:GPU:1'):
         train(gen_model, disc_model, train_dataset, train_summary_writer, log_iter=200)
         
 # import os

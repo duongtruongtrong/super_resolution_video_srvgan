@@ -75,8 +75,8 @@ for video_path in train_30fps_dir:
 # In[13]:
 
 
-hr_height = 360
-hr_width = 640
+hr_height = 360 // 2
+hr_width = 640 // 2
 scale = 2
 
 lr_height = hr_height // scale
@@ -121,6 +121,18 @@ def parse_image(image_path):
 
     return image
 
+def random_crop(image):
+    """
+    Function that randomly crop image to desired resolution to produce high_res image.
+    Args:
+        image: A tf tensor of the loaded frames.
+    Returns:
+        image: A tf tensor of the loaded frames.
+    """
+    high_res = tf.image.random_crop(image, [hr_height, hr_width, 3])
+
+    return high_res
+
 def flip(ds):
     """
     Function that flip horizontally/vertically all images in 1 dataset.
@@ -160,7 +172,7 @@ def high_low_res_pairs(ds):
     """
     method_list = ['bilinear', 'lanczos3', 'lanczos5', 'bicubic', 'gaussian', 'nearest', 'area', 'mitchellcubic']
     downsampling_method = random.choice(method_list)
-    
+
     def downsampling(high_res):
         """
         Function that generates a low resolution image given the high resolution image.
@@ -175,11 +187,7 @@ def high_low_res_pairs(ds):
                                   [lr_height, lr_width],
                                   preserve_aspect_ratio=True,
                                   method=downsampling_method)
-    
-        high_res = tf.image.resize(high_res, 
-                                  [hr_height, hr_width],
-                                  preserve_aspect_ratio=True,
-                                  method=downsampling_method)
+
         return low_res, high_res
     
     ds = ds.map(downsampling, num_parallel_calls=tf.data.experimental.AUTOTUNE)
@@ -227,6 +235,9 @@ def dataset(image_paths, batch_size=2):
     # image paths to tensor
     dataset = dataset.map(parse_image, num_parallel_calls=AUTOTUNE)
 
+    # randomly crop frame
+    dataset = dataset.map(random_crop, num_parallel_calls=AUTOTUNE)
+
     # randomly flip all frames in 1 video
     dataset = dataset.apply(flip)
 
@@ -245,7 +256,7 @@ def dataset(image_paths, batch_size=2):
 
 # # 3. Models
 
-# ## 3.1. VGG Model and Content Loss
+# ## 3.1. VGG Model and Feature Loss
 
 # In[20]:
 
@@ -271,7 +282,7 @@ vgg_model = tf.keras.models.Model(inputs=vgg.input, outputs=vgg.get_layer("block
 # In[22]:
 
 @tf.function
-def content_loss(hr, sr):
+def feature_loss(hr, sr):
     """
     Returns Mean Square Error of VGG19 feature extracted original image (y) and VGG19 feature extracted generated image (y_hat).
     Args:
@@ -287,6 +298,21 @@ def content_loss(hr, sr):
     mse = tf.keras.losses.MeanSquaredError()(hr_features, sr_features)
     return mse
 
+@tf.function
+def content_loss(hr, sr):
+    """
+    Returns Mean Square Error of original image (y) and generated image (y_hat).
+    Args:
+        hr: A tf tensor of original image (y)
+        sr: A tf tensor of generated image (y_hat)
+    Returns:
+        mse: Mean Square Error.
+    """
+    sr = 255.0 * (sr + 1.0) / 2.0
+    hr = 255.0 * (hr + 1.0) / 2.0
+    mse = tf.keras.losses.MeanAbsoluteError()(sr, hr)
+    return mse
+
 # ## 3.2. Optimizers
 
 # In[28]:
@@ -297,15 +323,15 @@ lr = 1e-3
 
 gen_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr,
-    decay_steps=100000,
-    decay_rate=0.1,
+    decay_steps=20000,
+    decay_rate=1e-2,
     staircase=True
 )
 
 disc_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr * 5,  # TTUR - Two Time Scale Updates
-    decay_steps=100000,
-    decay_rate=0.1,
+    decay_steps=20000,
+    decay_rate=1e-2,
     staircase=True
 )
 
@@ -350,7 +376,7 @@ def pretrain_step(gen_model, x, y):
     return loss_mse
 
 
-def pretrain_generator(gen_model, dataset, writer):
+def pretrain_generator(gen_model, dataset, writer, log_iter=200):
     """Function that pretrains the generator slightly, to avoid local minima.
     Args:
         gen_model: A compiled generator model.
@@ -365,7 +391,7 @@ def pretrain_generator(gen_model, dataset, writer):
         for _ in range(1):
             for x, y in dataset:
                 loss = pretrain_step(gen_model, x, y)
-                if pretrain_iteration % 200 == 0:
+                if pretrain_iteration % log_iter == 0:
                     print(f'Pretrain Step: {pretrain_iteration}, Pretrain MSE Loss: {loss}')
                     tf.summary.scalar('MSE Loss', loss, step=tf.cast(pretrain_iteration, tf.int64))
                     writer.flush()
@@ -399,10 +425,11 @@ def train_step(gen_model, disc_model, x, y):
         fake_prediction = disc_model(fake_hr)
 #         print('disc_model')
         # Generator loss
+        feat_loss = feature_loss(y, fake_hr)
         cont_loss = content_loss(y, fake_hr)
         adv_loss = 1e-3 * tf.keras.losses.BinaryCrossentropy()(valid, fake_prediction)
         mse_loss = tf.keras.losses.MeanSquaredError()(y, fake_hr)
-        perceptual_loss = cont_loss + adv_loss + mse_loss
+        perceptual_loss = feat_loss + cont_loss + adv_loss + mse_loss
 
         # Discriminator loss
         valid_loss = tf.keras.losses.BinaryCrossentropy()(valid, valid_prediction)
@@ -420,7 +447,7 @@ def train_step(gen_model, disc_model, x, y):
     disc_optimizer.apply_gradients(zip(disc_grads, disc_model.trainable_variables))
 #     print('optimizer')
     
-    return disc_loss, adv_loss, cont_loss, mse_loss
+    return disc_loss, adv_loss, feat_loss, cont_loss, mse_loss
 
 
 def train(gen_model, disc_model, dataset, writer, log_iter=200):
@@ -439,18 +466,19 @@ def train(gen_model, disc_model, dataset, writer, log_iter=200):
     with writer.as_default():
         # Iterate over dataset
         for x, y in dataset:
-            disc_loss, adv_loss, cont_loss, mse_loss = train_step(gen_model, disc_model, x, y)
+            disc_loss, adv_loss, feat_loss, cont_loss, mse_loss = train_step(gen_model, disc_model, x, y)
 #             print(train_iteration)
             # Log tensorboard summaries if log iteration is reached.
             if train_iteration % log_iter == 0:
-                print(f'Train Step: {train_iteration}, Adversarial Loss: {adv_loss}, Content Loss: {cont_loss}, MSE Loss: {mse_loss}, Discriminator Loss: {disc_loss}')
+                print(f'Train Step: {train_iteration}, Adversarial Loss: {adv_loss}, Feature Loss: {feat_loss}, Content Loss: {cont_loss}, MSE Loss: {mse_loss}, Discriminator Loss: {disc_loss}')
                 
                 tf.summary.scalar('Adversarial Loss', adv_loss, step=train_iteration)
+                tf.summary.scalar('Feature Loss', feat_loss, step=train_iteration)
                 tf.summary.scalar('Content Loss', cont_loss, step=train_iteration)
                 tf.summary.scalar('MSE Loss', mse_loss, step=train_iteration)
                 tf.summary.scalar('Discriminator Loss', disc_loss, step=train_iteration)
 
-                if train_iteration % 10000 == 0:
+                if train_iteration % 700 == 0:
                     tf.summary.image('Low Res', tf.cast(255 * x, tf.uint8), step=train_iteration)
                     tf.summary.image('High Res', tf.cast(255 * (y + 1.0) / 2.0, tf.uint8), step=train_iteration)
                     tf.summary.image('Generated', tf.cast(255 * (gen_model.predict(x) + 1.0) / 2.0, tf.uint8), step=train_iteration)
@@ -463,34 +491,36 @@ def train(gen_model, disc_model, dataset, writer, log_iter=200):
 # ============================================================
 # Load pretrain models (generator.h5 and disc_model)
 
-with tf.device('/device:GPU:1'):
+# Recreate the exact same model, including its weights and the optimizer
+gen_model = tf.keras.models.load_model('models/generator_upscale_2_times.h5')
 
-#     sample_train_dataset
-#     train_dataset
-    # Recreate the exact same model, including its weights and the optimizer
-    gen_model = tf.keras.models.load_model('models/generator_upscale_2_times.h5')
+# Recreate the exact same model, including its weights and the optimizer
+disc_model = tf.keras.models.load_model('models/discriminator_upscale_2_times.h5')
 
-    # Recreate the exact same model, including its weights and the optimizer
-    disc_model = tf.keras.models.load_model('models/discriminator_upscale_2_times.h5')
+# Define the directory for saving the SRGAN training tensorbaord summary.
+train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
+
+epochs = 2
+# speed: 55 min/epoch
+
+# training history: 
+# 3 epochs (first): 2.5 hours
+# 8 epochs: 7 hours
+# 2 epochs: 2 hours
+# 9 epochs: 9 hours
+
+batch_size = 15
+
+# Run training.
+for _ in range(epochs):
+    print('===================')
+    print(f'Epoch: {_}\n')
     
-    # Define the directory for saving the SRGAN training tensorbaord summary.
-    train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
+    # recreate dataset every epoch to lightly augment the frames. ".repeat()" in dataset pipeline function does not help.
 
-    epochs = 2
-    # speed: 55 min/epoch
-
-    batch_size = 2
-
-    # Run training.
-    for _ in range(epochs):
-        print('===================')
-        print(f'Epoch: {_}\n')
-        
-        # recreate dataset every epoch to lightly augment the frames. ".repeat()" in dataset pipeline function does not help.
-
-        train_dataset = dataset(train_image_30fps_paths, batch_size=batch_size)
-        # sample_train_dataset = dataset(train_image_30fps_paths[:180], batch_size=batch_size)
-        
+    train_dataset = dataset(train_image_30fps_paths, batch_size=batch_size)
+    # sample_train_dataset = dataset(train_image_30fps_paths[:180], batch_size=batch_size)
+    with tf.device('/device:GPU:1'):
         train(gen_model, disc_model, train_dataset, train_summary_writer, log_iter=200)
 
 # import os
