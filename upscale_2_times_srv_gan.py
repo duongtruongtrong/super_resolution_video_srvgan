@@ -687,14 +687,14 @@ lr = 1e-3
 
 gen_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr,
-    decay_steps=20000,
+    decay_steps=10000,
     decay_rate=1e-2,
     staircase=True
 )
 
 disc_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr * 5,  # TTUR - Two Time Scale Updates
-    decay_steps=20000,
+    decay_steps=10000,
     decay_rate=1e-2,
     staircase=True
 )
@@ -801,9 +801,8 @@ def train_step(gen_model, disc_model, x, y):
         # not helping because it makes adversial loss increase and discriminator loss decrease
         # cont_loss = content_loss(y, fake_hr)
 
-        # Adversarial Loss need to be decreased. Why smallen it?
-        # 1e-3 * 
-        adv_loss = tf.keras.losses.BinaryCrossentropy()(valid, fake_prediction)
+        # Adversarial Loss need to be decreased. Smallen the number to make it decrease faster
+        adv_loss = 1e-3 * tf.keras.losses.BinaryCrossentropy()(valid, fake_prediction)
         mse_loss = tf.keras.losses.MeanSquaredError()(y, fake_hr)
         perceptual_loss = feat_loss + adv_loss + mse_loss
 
@@ -893,11 +892,11 @@ with tf.device('/device:GPU:1'):
     # Define the directory for saving the SRGAN training tensorbaord summary.
     train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
-    epochs = 5
+    epochs = 10
     # speed: 14 min/epoch
 
     # training history: 
-    # 5 epochs (first): 1 hours
+    # 10 epochs (first): 1 hours
     # 40 epochs: 9 hours
     # 18 epochs:
     
@@ -923,6 +922,6 @@ for _ in range(epochs):
         train(gen_model, disc_model, train_dataset, train_summary_writer, log_iter=200)
         
 # import os
-# import time
-# time.sleep(10)
-# os.system('shutdown /p /f')
+import time
+time.sleep(10)
+os.system('shutdown /p /f')

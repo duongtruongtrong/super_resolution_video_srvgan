@@ -51,17 +51,17 @@ train_30fps_dir = [os.path.join(train_30fps_dir, p) for p in os.listdir(train_30
 # In[7]:
 
 import random
-random.shuffle(train_30fps_dir) # make the training dataset random
-# random.shuffle(train_60fps_dir) # make the training dataset random
+# random.shuffle(train_30fps_dir) # make the training dataset random
+# # random.shuffle(train_60fps_dir) # make the training dataset random
 
-# ## 1.3. Get Image Paths
+# # ## 1.3. Get Image Paths
 
-# In[9]:
+# # In[9]:
 
-train_image_30fps_paths = []
-for video_path in train_30fps_dir:
-    for x in os.listdir(video_path):
-        train_image_30fps_paths.append(os.path.join(video_path, x))
+# train_image_30fps_paths = []
+# for video_path in train_30fps_dir:
+#     for x in os.listdir(video_path):
+#         train_image_30fps_paths.append(os.path.join(video_path, x))
 
 # output format: [image1.png, image2.png,...]
 
@@ -368,19 +368,18 @@ def feature_loss(hr, sr):
 
 
 # Define a learning rate decay schedule.
-lr = 1e-3
-#  - (1e-2 * ((40 * 1200) // 20000))
+lr = 1e-3 - (1e-2 * ((10 * 1200) // 10000))
 
 gen_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr,
-    decay_steps=20000,
+    decay_steps=10000,
     decay_rate=1e-2,
     staircase=True
 )
 
 disc_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr * 5,  # TTUR - Two Time Scale Updates
-    decay_steps=20000,
+    decay_steps=10000,
     decay_rate=1e-2,
     staircase=True
 )
@@ -488,9 +487,8 @@ def train_step(gen_model, disc_model, x, y):
         # not helping because it makes adversial loss increase and discriminator loss decrease
         # cont_loss = content_loss(y, fake_hr)
 
-        # Adversarial Loss need to be decreased. Why smallen it?
-        # 1e-3 * 
-        adv_loss = tf.keras.losses.BinaryCrossentropy()(valid, fake_prediction)
+        # Adversarial Loss need to be decreased. Smallen the number to make it decrease faster
+        adv_loss = 1e-3 * tf.keras.losses.BinaryCrossentropy()(valid, fake_prediction)
         mse_loss = tf.keras.losses.MeanSquaredError()(y, fake_hr)
         perceptual_loss = feat_loss + adv_loss + mse_loss
 
@@ -560,13 +558,12 @@ gen_model = tf.keras.models.load_model('models/generator_upscale_2_times.h5')
 # Define the directory for saving the SRGAN training tensorbaord summary.
 train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
-epochs = 18
+epochs = 30
 # speed: 14 min/epoch
 
 # training history: 
-# 5 epochs (first): 1 hours
-# 40 epochs: 9 hours
-# 18 epochs:
+# 10 epochs (first): 2 hours
+
 
 batch_size = 9
 
