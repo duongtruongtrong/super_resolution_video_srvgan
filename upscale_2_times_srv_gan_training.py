@@ -132,6 +132,9 @@ def random_crop_resize(ds):
     method_list = ['crop', 'resize']
     crop_resize_method = random.choice(method_list)
 
+    method_list = ['bilinear', 'gaussian', 'nearest', 'area']
+    downsampling_method = random.choice(method_list)
+
     def random_crop(image):
         """
         Function that randomly crop image to desired resolution to produce high_res image.
@@ -140,12 +143,18 @@ def random_crop_resize(ds):
         Returns:
             image: A tf tensor of cropped frames.
         """
-        image = tf.image.random_crop(image, [hr_height, hr_width, 3])
+
+        # resolution under 360 is too smal that cropping out too much details of the image.
+        # if hr_height < 360:
+        image = tf.image.random_crop(image, [hr_height*2, hr_width*2, 3])
+        image = tf.image.resize(image, 
+                                [hr_height, hr_width],
+                                preserve_aspect_ratio=True,
+                                method=downsampling_method)
+        # else:
+            # image = tf.image.random_crop(image, [hr_height, hr_width, 3])
 
         return image
-    
-    method_list = ['bilinear', 'gaussian', 'nearest', 'area']
-    downsampling_method = random.choice(method_list)
 
     def downsampling(image):
         """
@@ -337,20 +346,21 @@ def feature_loss(hr, sr):
     mse = tf.keras.losses.MeanSquaredError()(hr_features, sr_features)
     return mse
 
-@tf.function
-def content_loss(hr, sr):
-    """
-    Returns Mean Square Error of original image (y) and generated image (y_hat).
-    Args:
-        hr: A tf tensor of original image (y)
-        sr: A tf tensor of generated image (y_hat)
-    Returns:
-        mse: Mean Square Error.
-    """
-    sr = 255.0 * (sr + 1.0) / 2.0
-    hr = 255.0 * (hr + 1.0) / 2.0
-    mse = tf.keras.losses.MeanAbsoluteError()(sr, hr)
-    return mse
+# not helping because it makes adversial loss increase and discriminator loss decrease
+# @tf.function
+# def content_loss(hr, sr):
+#     """
+#     Returns Mean Square Error of original image (y) and generated image (y_hat).
+#     Args:
+#         hr: A tf tensor of original image (y)
+#         sr: A tf tensor of generated image (y_hat)
+#     Returns:
+#         mse: Mean Square Error.
+#     """
+#     sr = 255.0 * (sr + 1.0) / 2.0
+#     hr = 255.0 * (hr + 1.0) / 2.0
+#     mse = tf.keras.losses.MeanAbsoluteError()(sr, hr)
+#     return mse
 
 # ## 3.2. Optimizers
 
@@ -358,7 +368,8 @@ def content_loss(hr, sr):
 
 
 # Define a learning rate decay schedule.
-lr = 1e-3 - (1e-2 * ((40 * 1200) // 20000))
+lr = 1e-3
+#  - (1e-2 * ((40 * 1200) // 20000))
 
 gen_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr,
@@ -473,10 +484,15 @@ def train_step(gen_model, disc_model, x, y):
 #         print('disc_model')
         # Generator loss
         feat_loss = feature_loss(y, fake_hr)
-        cont_loss = content_loss(y, fake_hr)
-        adv_loss = 1e-3 * tf.keras.losses.BinaryCrossentropy()(valid, fake_prediction)
+
+        # not helping because it makes adversial loss increase and discriminator loss decrease
+        # cont_loss = content_loss(y, fake_hr)
+
+        # Adversarial Loss need to be decreased. Why smallen it?
+        # 1e-3 * 
+        adv_loss = tf.keras.losses.BinaryCrossentropy()(valid, fake_prediction)
         mse_loss = tf.keras.losses.MeanSquaredError()(y, fake_hr)
-        perceptual_loss = feat_loss + cont_loss + adv_loss + mse_loss
+        perceptual_loss = feat_loss + adv_loss + mse_loss
 
         # Discriminator loss
         valid_loss = tf.keras.losses.BinaryCrossentropy()(valid, valid_prediction)
@@ -494,7 +510,7 @@ def train_step(gen_model, disc_model, x, y):
     disc_optimizer.apply_gradients(zip(disc_grads, disc_model.trainable_variables))
 #     print('optimizer')
     
-    return disc_loss, adv_loss, feat_loss, cont_loss, mse_loss
+    return disc_loss, adv_loss, feat_loss, mse_loss
 
 
 def train(gen_model, disc_model, dataset, writer, log_iter=200):
@@ -513,15 +529,15 @@ def train(gen_model, disc_model, dataset, writer, log_iter=200):
     with writer.as_default():
         # Iterate over dataset
         for x, y in dataset:
-            disc_loss, adv_loss, feat_loss, cont_loss, mse_loss = train_step(gen_model, disc_model, x, y)
+            disc_loss, adv_loss, feat_loss, mse_loss = train_step(gen_model, disc_model, x, y)
 #             print(train_iteration)
             # Log tensorboard summaries if log iteration is reached.
             if train_iteration % log_iter == 0:
-                print(f'Train Step: {train_iteration}, Adversarial Loss: {adv_loss}, Feature Loss: {feat_loss}, Content Loss: {cont_loss}, MSE Loss: {mse_loss}, Discriminator Loss: {disc_loss}')
+                print(f'Train Step: {train_iteration}, Adversarial Loss: {adv_loss}, Feature Loss: {feat_loss}, MSE Loss: {mse_loss}, Discriminator Loss: {disc_loss}')
                 
                 tf.summary.scalar('Adversarial Loss', adv_loss, step=train_iteration)
                 tf.summary.scalar('Feature Loss', feat_loss, step=train_iteration)
-                tf.summary.scalar('Content Loss', cont_loss, step=train_iteration)
+                # tf.summary.scalar('Content Loss', cont_loss, step=train_iteration)
                 tf.summary.scalar('MSE Loss', mse_loss, step=train_iteration)
                 tf.summary.scalar('Discriminator Loss', disc_loss, step=train_iteration)
 
@@ -544,12 +560,13 @@ gen_model = tf.keras.models.load_model('models/generator_upscale_2_times.h5')
 # Define the directory for saving the SRGAN training tensorbaord summary.
 train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
-epochs = 40
-# speed: 20 min/epoch
+epochs = 18
+# speed: 14 min/epoch
 
 # training history: 
 # 5 epochs (first): 1 hours
-# 40 epochs:
+# 40 epochs: 9 hours
+# 18 epochs:
 
 batch_size = 9
 
@@ -557,11 +574,20 @@ batch_size = 9
 for _ in range(epochs):
     print('===================')
     print(f'Epoch: {_}\n')
+
+    # shuffle video directories
+    # [train_30fps_dir, train_60fps_dir, val_30fps_dir, val_60fps_dir]
+    random.shuffle(train_30fps_dir) # make the training dataset random
+
+    train_image_30fps_paths = []
+    for video_path in train_30fps_dir:
+        for x in os.listdir(video_path):
+            train_image_30fps_paths.append(os.path.join(video_path, x))
     
     # recreate dataset every epoch to lightly augment the frames. ".repeat()" in dataset pipeline function does not help.
-
     train_dataset = dataset(train_image_30fps_paths, batch_size=batch_size)
     # sample_train_dataset = dataset(train_image_30fps_paths[:180], batch_size=batch_size)
+
     with tf.device('/device:GPU:1'):
         train(gen_model, disc_model, train_dataset, train_summary_writer, log_iter=200)
 

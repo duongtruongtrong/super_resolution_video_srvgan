@@ -208,6 +208,9 @@ def random_crop_resize(ds):
     method_list = ['crop', 'resize']
     crop_resize_method = random.choice(method_list)
 
+    method_list = ['bilinear', 'gaussian', 'nearest', 'area']
+    downsampling_method = random.choice(method_list)
+
     def random_crop(image):
         """
         Function that randomly crop image to desired resolution to produce high_res image.
@@ -216,12 +219,18 @@ def random_crop_resize(ds):
         Returns:
             image: A tf tensor of cropped frames.
         """
-        image = tf.image.random_crop(image, [hr_height, hr_width, 3])
+
+        # resolution under 360 is too smal that cropping out too much details of the image.
+        # if hr_height < 360:
+        image = tf.image.random_crop(image, [hr_height*2, hr_width*2, 3])
+        image = tf.image.resize(image, 
+                                [hr_height, hr_width],
+                                preserve_aspect_ratio=True,
+                                method=downsampling_method)
+        # else:
+            # image = tf.image.random_crop(image, [hr_height, hr_width, 3])
 
         return image
-    
-    method_list = ['bilinear', 'gaussian', 'nearest', 'area']
-    downsampling_method = random.choice(method_list)
 
     def downsampling(image):
         """
@@ -788,10 +797,15 @@ def train_step(gen_model, disc_model, x, y):
 #         print('disc_model')
         # Generator loss
         feat_loss = feature_loss(y, fake_hr)
-        cont_loss = content_loss(y, fake_hr)
-        adv_loss = 1e-3 * tf.keras.losses.BinaryCrossentropy()(valid, fake_prediction)
+
+        # not helping because it makes adversial loss increase and discriminator loss decrease
+        # cont_loss = content_loss(y, fake_hr)
+
+        # Adversarial Loss need to be decreased. Why smallen it?
+        # 1e-3 * 
+        adv_loss = tf.keras.losses.BinaryCrossentropy()(valid, fake_prediction)
         mse_loss = tf.keras.losses.MeanSquaredError()(y, fake_hr)
-        perceptual_loss = feat_loss + cont_loss + adv_loss + mse_loss
+        perceptual_loss = feat_loss + adv_loss + mse_loss
 
         # Discriminator loss
         valid_loss = tf.keras.losses.BinaryCrossentropy()(valid, valid_prediction)
@@ -809,7 +823,7 @@ def train_step(gen_model, disc_model, x, y):
     disc_optimizer.apply_gradients(zip(disc_grads, disc_model.trainable_variables))
 #     print('optimizer')
     
-    return disc_loss, adv_loss, feat_loss, cont_loss, mse_loss
+    return disc_loss, adv_loss, feat_loss, mse_loss
 
 
 def train(gen_model, disc_model, dataset, writer, log_iter=200):
@@ -828,23 +842,23 @@ def train(gen_model, disc_model, dataset, writer, log_iter=200):
     with writer.as_default():
         # Iterate over dataset
         for x, y in dataset:
-            disc_loss, adv_loss, feat_loss, cont_loss, mse_loss = train_step(gen_model, disc_model, x, y)
+            disc_loss, adv_loss, feat_loss, mse_loss = train_step(gen_model, disc_model, x, y)
 #             print(train_iteration)
             # Log tensorboard summaries if log iteration is reached.
             if train_iteration % log_iter == 0:
-                print(f'Train Step: {train_iteration}, Adversarial Loss: {adv_loss}, Feature Loss: {feat_loss}, Content Loss: {cont_loss}, MSE Loss: {mse_loss}, Discriminator Loss: {disc_loss}')
+                print(f'Train Step: {train_iteration}, Adversarial Loss: {adv_loss}, Feature Loss: {feat_loss}, MSE Loss: {mse_loss}, Discriminator Loss: {disc_loss}')
                 
                 tf.summary.scalar('Adversarial Loss', adv_loss, step=train_iteration)
                 tf.summary.scalar('Feature Loss', feat_loss, step=train_iteration)
-                tf.summary.scalar('Content Loss', cont_loss, step=train_iteration)
+                # tf.summary.scalar('Content Loss', cont_loss, step=train_iteration)
                 tf.summary.scalar('MSE Loss', mse_loss, step=train_iteration)
                 tf.summary.scalar('Discriminator Loss', disc_loss, step=train_iteration)
 
-                if train_iteration % 600 == 0:
+                if train_iteration % (log_iter*10) == 0:
                     tf.summary.image('Low Res', tf.cast(255 * x, tf.uint8), step=train_iteration)
                     tf.summary.image('High Res', tf.cast(255 * (y + 1.0) / 2.0, tf.uint8), step=train_iteration)
                     tf.summary.image('Generated', tf.cast(255 * (gen_model.predict(x) + 1.0) / 2.0, tf.uint8), step=train_iteration)
-                    
+
                 gen_model.save('models/generator_upscale_2_times.h5')
                 disc_model.save('models/discriminator_upscale_2_times.h5')
                 writer.flush()
@@ -880,15 +894,26 @@ with tf.device('/device:GPU:1'):
     train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
     epochs = 5
-    # speed: 20 min/epoch
+    # speed: 14 min/epoch
 
     # training history: 
     # 5 epochs (first): 1 hours
+    # 40 epochs: 9 hours
+    # 18 epochs:
     
 # Run training.
 for _ in range(epochs):
     print('===================')
     print(f'Epoch: {_}\n')
+
+    # shuffle video directories
+    # [train_30fps_dir, train_60fps_dir, val_30fps_dir, val_60fps_dir]
+    random.shuffle(train_30fps_dir) # make the training dataset random
+
+    train_image_30fps_paths = []
+    for video_path in train_30fps_dir:
+        for x in os.listdir(video_path):
+            train_image_30fps_paths.append(os.path.join(video_path, x))
 
     # recreate dataset every epoch to lightly augment the frames. ".repeat()" in dataset pipeline function does not help.
     train_dataset = dataset(train_image_30fps_paths, batch_size=batch_size)
