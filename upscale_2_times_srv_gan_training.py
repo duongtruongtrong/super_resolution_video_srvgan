@@ -341,8 +341,8 @@ def feature_loss(hr, sr):
     """
     sr = tf.keras.applications.vgg19.preprocess_input(((sr + 1.0) * 255) / 2.0)
     hr = tf.keras.applications.vgg19.preprocess_input(((hr + 1.0) * 255) / 2.0)
-    sr_features = vgg_model(sr) / 12.75
-    hr_features = vgg_model(hr) / 12.75
+    sr_features = vgg_model(sr) / 12.75 # why?
+    hr_features = vgg_model(hr) / 12.75 # why?
     mse = tf.keras.losses.MeanSquaredError()(hr_features, sr_features)
     return mse
 
@@ -368,19 +368,20 @@ def feature_loss(hr, sr):
 
 
 # Define a learning rate decay schedule.
-lr = 1e-3 - (1e-2 * ((10 * 1200) // 10000))
+lr = 1e-3 * 0.95 ** ((20 * 1200) // 10000)
+# print(lr)
 
 gen_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr,
     decay_steps=10000,
-    decay_rate=1e-2,
+    decay_rate=0.95, # 95%
     staircase=True
 )
 
 disc_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr * 5,  # TTUR - Two Time Scale Updates
     decay_steps=10000,
-    decay_rate=1e-2,
+    decay_rate=0.95, # 95%
     staircase=True
 )
 
@@ -558,11 +559,13 @@ gen_model = tf.keras.models.load_model('models/generator_upscale_2_times.h5')
 # Define the directory for saving the SRGAN training tensorbaord summary.
 train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
-epochs = 30
+epochs = 8 # Turn on Turbo mode
 # speed: 14 min/epoch
 
 # training history: 
 # 10 epochs (first): 2 hours
+# 10 epochs: 2 hours
+# 7 epochs: 1.5 hours
 
 
 batch_size = 9
@@ -589,6 +592,6 @@ for _ in range(epochs):
         train(gen_model, disc_model, train_dataset, train_summary_writer, log_iter=200)
 
 # import os
-import time
-time.sleep(10)
-os.system('shutdown /p /f')
+# import time
+# time.sleep(10)
+# os.system('shutdown /p /f')

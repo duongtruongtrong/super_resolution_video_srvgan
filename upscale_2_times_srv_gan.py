@@ -683,19 +683,21 @@ disc_model.summary()
 
 
 # Define a learning rate decay schedule.
-lr = 1e-3
+lr = 1e-3 
+# * 0.95 ** ((10 * 1200) // 10000)
+# print(lr)
 
 gen_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr,
     decay_steps=10000,
-    decay_rate=1e-2,
+    decay_rate=0.95, # 95%
     staircase=True
 )
 
 disc_schedule = keras.optimizers.schedules.ExponentialDecay(
     lr * 5,  # TTUR - Two Time Scale Updates
     decay_steps=10000,
-    decay_rate=1e-2,
+    decay_rate=0.95, # 95%
     staircase=True
 )
 
@@ -892,13 +894,11 @@ with tf.device('/device:GPU:1'):
     # Define the directory for saving the SRGAN training tensorbaord summary.
     train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
-    epochs = 10
+    epochs = 10 # Turn on Turbo mode
     # speed: 14 min/epoch
 
     # training history: 
-    # 10 epochs (first): 1 hours
-    # 40 epochs: 9 hours
-    # 18 epochs:
+    # 10 epochs (first): 2 hours
     
 # Run training.
 for _ in range(epochs):
