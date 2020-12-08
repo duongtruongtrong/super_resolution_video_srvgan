@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<!-- Your code here -->
+<div class="container">
+    <div class="row">
+        <div class="col">
+            <div class="col-lg-8  offset-lg-2"></div>
+                <h1>Comparision</h1>
+                <a class="btn btn-primary" href="/" role="button">Home</a>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+
+        <div class="col">
+            <div class="col-lg-8  offset-lg-2">
+                <h3 class="mt-5">Low Res Input</h3>
+                <img src="{{ url_for('video_feed') }}" width="100%">
+            </div>
+        </div>
+
+        <div class="col">
+            <div class="col-lg-8  offset-lg-2">
+                <h3 class="mt-5">Generated High Res</h3>
+                <img src="{{ url_for('upscale') }}" width="100%">
+            </div>
+        </div>
+
+    </div>
+
+    <div class="row">
+
+        <div class="col">
+            <div class="col-lg-8  offset-lg-2">
+                <h3 class="mt-5">Original High Res</h3>
+                <img src="{{ url_for('high_res') }}" width="100%">
+            </div>
+        </div>
+
+        <div class="col">
+            <div class="col-lg-8  offset-lg-2">
+                <h3 class="mt-5">Resized High Res</h3>
+                <img src="{{ url_for('test_upscale') }}" width="100%">
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}
