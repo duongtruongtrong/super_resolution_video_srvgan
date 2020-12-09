@@ -27,7 +27,7 @@ import re
 import os
 import base64
 import uuid
-import cv2
+from cv2 import cv2
 
 import time
 
@@ -42,16 +42,16 @@ camera = cv2.VideoCapture(0)
 # resize capture resulution
 # https://www.kurokesu.com/main/2020/07/12/pulling-full-resolution-from-a-webcam-with-opencv-windows/
 
-width = 1280
-height = 720
+width = 640
+height = 480
 
 codec = 0x47504A4D  # MJPG
-camera.set(cv2.CAP_PROP_FPS, 24.0)
+# camera.set(cv2.CAP_PROP_FPS, 30.0)
 camera.set(cv2.CAP_PROP_FOURCC, codec)
 camera.set(cv2.CAP_PROP_FRAME_WIDTH, width)
 camera.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
-resize_width, resize_height = (80, 45)
+resize_width, resize_height = (160, 120)
 
 model = tf.keras.models.load_model("models/generator_upscale_2_times.h5")
 
@@ -61,15 +61,17 @@ inputs = tf.keras.Input((None, None, 3))
 # Trace out the graph using the input:
 outputs = model(inputs)
 
+model = tf.keras.models.Model(inputs, outputs)
+
 # How many time to use model.predict, each model.predict upscale by 2 times, logarith of 2.
-upscale_times = int(np.log2(1280 / resize_width))
+# upscale_times = int(np.log2(640 / resize_width))
 
 # each loop use 1 model due to this error: # Invalid argument:  Conv2DSlowBackpropInput: Size of out_backprop doesn't match computed:
-model_list = []
+# model_list = []
 
 # Override the model with new inputs and outputs shapes.
-for i in range(upscale_times):
-    model_list.append(tf.keras.models.Model(inputs, outputs))
+# for i in range(upscale_times):
+#     model_list.append(tf.keras.models.Model(inputs, outputs))
 
 def webcam_low_res():
     frame_num = 1
@@ -89,10 +91,10 @@ def webcam_low_res():
             fps = round(frame_num/duration, 1) # 27 fps
 
             frame = cv2.putText(frame, str(fps), (10, frame.shape[0] - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 1)
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             frame_num += 1
 
-            ret, buffer = cv2.imencode('.jpg', frame)
+            _, buffer = cv2.imencode('.jpg', frame)
 
             frame = buffer.tobytes()
             yield (b'--frame\r\n'
@@ -103,6 +105,7 @@ def webcam_high_res():
     start = time.time()
     # loop over frames from the video stream
     while True:
+        
         success, frame = camera.read()  # read the camera frame
 
         if not success:
@@ -117,7 +120,7 @@ def webcam_high_res():
                     cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 5)
             frame_num += 1
 
-            ret, buffer = cv2.imencode('.jpg', frame)
+            _, buffer = cv2.imencode('.jpg', frame)
 
             frame = buffer.tobytes()
             yield (b'--frame\r\n'
@@ -128,34 +131,46 @@ def upscale_frame():
 
     frame_num = 1
     start = time.time()
-    
+
     # loop over frames from the video stream
     while True:
-        success, frame = camera.read()  # read the camera frame
+        _, frame = camera.read()  # read the camera frame
         # print('Resolution: ' + str(frame.shape[0]) + ' x ' + str(frame.shape[1]))
 
-        if not success:
-            break
-        else:
-            start_pred = time.time()
-
+        # if not success:
+        #     break
+        # else:
+        start_pred = time.time()
+        with tf.device('/device:GPU:1'):
             frame = cv2.resize(frame, (resize_width, resize_height))
             
+            # frame = cv2.resize(frame, (width // 2, height // 2))
             # opencv image to tensorflow image
             tensor_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
             tensor_image = tf.image.convert_image_dtype(tensor_image, tf.float32)
 
             tensor_image_gen = tf.expand_dims(tensor_image, axis=0)
+
+        
+            tensor_image_gen = model.predict(tensor_image_gen)
+
+            tensor_image_gen = tf.cast(255 * (tensor_image_gen + 1.0) / 2.0, tf.uint8)
+
+            tensor_image_gen = tf.image.convert_image_dtype(tensor_image_gen, tf.float32)
             
-            for i, model in zip(range(upscale_times), model_list):
-                with tf.device('/device:GPU:1'):
-                    tensor_image_gen = model.predict(tensor_image_gen, workers=16, use_multiprocessing=True)
+            tensor_image_gen = model.predict(tensor_image_gen)
 
-                    tensor_image_gen = tf.cast(255 * (tensor_image_gen + 1.0) / 2.0, tf.uint8)
+            tensor_image_gen = tf.cast(255 * (tensor_image_gen + 1.0) / 2.0, tf.uint8)
 
-                    if i != upscale_times-1:
-                        tensor_image_gen = tf.image.convert_image_dtype(tensor_image_gen, tf.float32)
+            # for i, model in zip(range(upscale_times), model_list):
+            #     with tf.device('/device:GPU:1'):
+            #         tensor_image_gen = model.predict(tensor_image_gen)
+
+            #         tensor_image_gen = tf.cast(255 * (tensor_image_gen + 1.0) / 2.0, tf.uint8)
+
+            #         if i != upscale_times-1:
+            #             tensor_image_gen = tf.image.convert_image_dtype(tensor_image_gen, tf.float32)
 
             # tensor to opencv image
             tensor_image_gen = cv2.cvtColor(tensor_image_gen[0].numpy(), cv2.COLOR_RGB2BGR)
@@ -181,11 +196,11 @@ def upscale_frame():
 
             frame_num += 1
 
-            ret, buffer = cv2.imencode('.jpg', tensor_image_gen)
+            _, buffer = cv2.imencode('.jpg', tensor_image_gen)
 
             frame = buffer.tobytes()
             yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
+                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
 
 def test_upscale_frame():
     frame_num = 1
@@ -199,7 +214,7 @@ def test_upscale_frame():
         else:
 
             frame = cv2.resize(frame, (resize_width, resize_height))
-            frame = cv2.resize(frame, (1280, 720))
+            frame = cv2.resize(frame, (width, height))
             
             end = time.time()
             duration = end - start
@@ -209,7 +224,7 @@ def test_upscale_frame():
                     cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 5)
             frame_num += 1
 
-            ret, buffer = cv2.imencode('.jpg', frame)
+            _, buffer = cv2.imencode('.jpg', frame)
 
             frame = buffer.tobytes()
             yield (b'--frame\r\n'
