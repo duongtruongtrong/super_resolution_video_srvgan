@@ -368,7 +368,7 @@ def feature_loss(hr, sr):
 
 
 # Define a learning rate decay schedule.
-lr = 1e-3 * 0.95 ** ((35 * 1200) // 100000)
+lr = 1e-3 * 0.95 ** ((75 * 1200) // 100000)
 # print(lr)
 
 gen_schedule = keras.optimizers.schedules.ExponentialDecay(
@@ -490,7 +490,7 @@ def train_step(gen_model, disc_model, x, y):
 
         # Adversarial Loss need to be decreased. Smallen the number to make it decrease faster
         adv_loss = 1e-3 * tf.keras.losses.BinaryCrossentropy()(valid, fake_prediction)
-        mse_loss = tf.keras.losses.MeanSquaredError()(y, fake_hr)
+        mse_loss = 1e-1 * tf.keras.losses.MeanSquaredError()(y, fake_hr)
         perceptual_loss = feat_loss + adv_loss + mse_loss
 
         # Discriminator loss
@@ -559,15 +559,16 @@ gen_model = tf.keras.models.load_model('models/generator_upscale_2_times.h5')
 # Define the directory for saving the SRGAN training tensorbaord summary.
 train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
-epochs = 30 # Turn on Turbo mode
+epochs = 40 # Turn on Turbo mode
 # speed: 14 min/epoch
 
-# training history: 
+# training history: total 75
 # 10 epochs (first): 2 hours
 # 10 epochs: 2 hours
 # 7 epochs: 1.5 hours
 # 8 epochs: 1.5 hours
 # 30 epochs: 6.5 hours
+# 10 epochs: 2 hours
 
 batch_size = 9
 

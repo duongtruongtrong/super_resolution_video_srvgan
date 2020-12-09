@@ -5,6 +5,7 @@
 
 # In[1]:
 
+from data_loader import DataLoader
 
 import os
 import pathlib
@@ -50,52 +51,14 @@ if gpus:
 
 # In[2]:
 
-
-# train_15fps_dir = os.path.join(*['data', 'REDS_VTSR', 'train', 'train_15fps'])
-# print(train_15fps_dir)
-
 train_30fps_dir = os.path.join(*['data', 'REDS_VTSR', 'train', 'train_30fps'])
 # print(train_30fps_dir)
-
-# train_60fps_dir = os.path.join(*['data', 'REDS_VTSR', 'train', 'train_60fps'])
-# print(train_60fps_dir)
-
-# val_15fps_dir = os.path.join(*['data', 'REDS_VTSR', 'val', 'val_15fps'])
-# print(val_15fps_dir)
-
-val_30fps_dir = os.path.join(*['data', 'REDS_VTSR', 'val', 'val_30fps'])
-# print(val_30fps_dir)
-
-# val_60fps_dir = os.path.join(*['data', 'REDS_VTSR', 'val', 'val_60fps'])
-# print(val_60fps_dir)
-
-test_15fps_dir = os.path.join(*['data', 'REDS_VTSR', 'test', 'test_15fps'])
-# print(test_15fps_dir)
 
 
 # In[3]:
 
-
-# train_15fps_dir = [os.path.join(train_15fps_dir, p) for p in os.listdir(train_15fps_dir)]
-# print('Train 15fps', train_15fps_dir[:2])
-
 train_30fps_dir = [os.path.join(train_30fps_dir, p) for p in os.listdir(train_30fps_dir)]
 # print('Train 30fps', train_30fps_dir[:2])
-
-# train_60fps_dir = [os.path.join(train_60fps_dir, p) for p in os.listdir(train_60fps_dir)]
-# print('Train 60fps', train_60fps_dir[:2])
-
-# val_15fps_dir = [os.path.join(val_15fps_dir, p) for p in os.listdir(val_15fps_dir)]
-# print('Val 15fps', val_15fps_dir[:2])
-
-val_30fps_dir = [os.path.join(val_30fps_dir, p) for p in os.listdir(val_30fps_dir)]
-# print('Val 30fps', val_30fps_dir[:2])
-
-# val_60fps_dir = [os.path.join(val_60fps_dir, p) for p in os.listdir(val_60fps_dir)]
-# print('Val 60fps', val_60fps_dir[:2])
-
-test_15fps_dir = [os.path.join(test_15fps_dir, p) for p in os.listdir(test_15fps_dir)]
-# print('Val 15fps', test_15fps_dir[:2])
 
 # ## 1.2. Randomize Videos Paths
 
@@ -120,29 +83,6 @@ for video_path in train_30fps_dir:
 
 # output format: [image1.png, image2.png,...]
 
-
-# In[10]:
-
-
-val_image_30fps_paths = []
-for video_path in val_30fps_dir:
-    for x in os.listdir(video_path):
-        val_image_30fps_paths.append(os.path.join(video_path, x))
-
-# output format: [image1.png, image2.png,...]
-
-
-# In[11]:
-
-
-test_image_15fps_paths = []
-for video_path in test_15fps_dir:
-    for x in os.listdir(video_path):
-        test_image_15fps_paths.append(os.path.join(video_path, x))
-
-# output format: [image1.png, image2.png,...]
-
-
 # # 2. Loading Data
 
 # ## 2.1. Train Dataset Pipeline
@@ -158,302 +98,11 @@ scale = 2
 lr_height = hr_height // scale
 lr_width = hr_width // scale
 
+batch_size = 9
 
-# In[14]:
+data_loader = DataLoader(hr_height, hr_width, lr_height, lr_width, batch_size)
 
-
-# 1 image as 1 element
-
-def reverse(ds):
-    """
-    Function that randomly reverse frames sequence in 1 video.
-    Args:
-        ds: A tf dataset.
-    Returns:
-        ds: A tf dataset with reversed frames sequence.
-    """ 
-#     reverse squence randomly
-    method_list = ['reverse', None]
-    reverse_method = random.choice(method_list)
-    
-    image_list = list(ds.as_numpy_iterator())
-
-    if reverse_method == 'reverse':
-        image_list.reverse()
-
-    return tf.data.Dataset.from_tensor_slices(image_list)
-
-def parse_image(image_path):
-    """
-    Function that loads the images given the path.
-    Args:
-        image_path: The paths to frames in the video.
-    Returns:
-        image: A tf tensor of the loaded frames.
-    """
-    image = tf.io.read_file(image_path)
-    image = tf.image.decode_jpeg(image, channels=3)
-    image = tf.image.convert_image_dtype(image, tf.float32)
-
-    return image
-
-def random_crop_resize(ds):
-    """
-    Function that randomly crop or resize image to desired resolution to produce high_res image.
-    Args:
-        ds: A tf dataset.
-    Returns:
-        ds: A tf dataset with cropped or resized frames.
-    """
-    method_list = ['crop', 'resize']
-    crop_resize_method = random.choice(method_list)
-
-    method_list = ['bilinear', 'gaussian', 'nearest', 'area']
-    downsampling_method = random.choice(method_list)
-
-    def random_crop(image):
-        """
-        Function that randomly crop image to desired resolution to produce high_res image.
-        Args:
-            image: A tf tensor of the loaded frames.
-        Returns:
-            image: A tf tensor of cropped frames.
-        """
-
-        # resolution under 360 is too smal that cropping out too much details of the image.
-        # if hr_height < 360:
-        image = tf.image.random_crop(image, [hr_height*2, hr_width*2, 3])
-        image = tf.image.resize(image, 
-                                [hr_height, hr_width],
-                                preserve_aspect_ratio=True,
-                                method=downsampling_method)
-        # else:
-            # image = tf.image.random_crop(image, [hr_height, hr_width, 3])
-
-        return image
-
-    def downsampling(image):
-        """
-        Function that resize image to desired resolution.
-        Downsampling methods: ['bilinear', 'gaussian', 'nearest', 'area']
-        Args:
-            image: A tf tensor of the loaded frames.
-        Returns:
-            image: A tf tensor of resized frames.
-        """
-#         print(tf.shape(high_res)[0])
-        image = tf.image.resize(image, 
-                                [hr_height, hr_width],
-                                preserve_aspect_ratio=True,
-                                method=downsampling_method)
-
-        return image
-
-    if crop_resize_method == 'crop':
-        # randomly crop frame
-        ds = ds.map(random_crop, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    else:
-        # downsampling frame
-        ds = ds.map(downsampling, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
-    return ds
-
-def flip(ds):
-    """
-    Function that flip horizontally/vertically all images in 1 dataset.
-    Args:
-        ds: A tf dataset.
-    Returns:
-        ds: A tf dataset with flipped images.
-    """ 
-#     flip the image randomly
-    method_list = ['horizontal', 'vertical', None]
-    flip_method = random.choice(method_list)
-    
-    def flip_left_right(image):
-        image = tf.image.flip_left_right(image)
-        return image
-    
-    def flip_up_down(image):
-        image = tf.image.flip_up_down(image)
-        return image
-    
-    if flip_method == 'horizontal':
-        ds = ds.map(flip_up_down, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    elif flip_method == 'vertical':
-        ds = ds.map(flip_left_right, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        
-    return ds
-
-def high_low_res_pairs(ds):
-    """
-    Function that generates a low resolution image given the high resolution image with random methods.
-    Downsampling methods: ['bilinear', 'gaussian', 'nearest', 'area']
-    Args:
-        ds: A tf dataset.
-    Returns:
-        ds: A tf dataset with low and high res images.
-    """
-    method_list = ['bilinear', 'gaussian', 'nearest', 'area']
-    downsampling_method = random.choice(method_list)
-
-    def downsampling(high_res):
-        """
-        Function that generates a low resolution image given the high resolution image.
-        Args:
-            high_res: A tf tensor of the high res image.
-        Returns:
-            low_res: A tf tensor of the low res image.
-            high_res: A tf tensor of the high res image.
-        """
-#         print(tf.shape(high_res)[0])
-        low_res = tf.image.resize(high_res, 
-                                  [lr_height, lr_width],
-                                  preserve_aspect_ratio=True,
-                                  method=downsampling_method)
-
-        return low_res, high_res
-    
-    ds = ds.map(downsampling, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    
-    return ds
-
-def rescale(low_res, high_res):
-    """
-    Function that rescales the pixel values of high_res to the -1 to 1 range.
-    For use with the generator output tanh function.
-    Args:
-        low_res: The tf tensor of the low res image.
-        high_res: The tf tensor of the high res image.
-    Returns:
-        low_res: The tf tensor of the low res image, rescaled.
-        high_res: The tf tensor of the high res image, rescaled.
-    """
-    high_res = high_res * 2.0 - 1.0
-
-    return low_res, high_res
-
-def dataset(image_paths, batch_size=2):
-    """
-    Returns a tf dataset object with specified mappings. No shuffle and No repeat.
-    No shuffle because it will screw up the frame sequence.
-    No repeat because training model will use a manual for loop.
-    Args:
-        image_paths: Str, Path to images.
-        batch_size: Int, The number of elements in a batch returned by the dataset.
-    Returns:
-        dataset: A tf dataset object.
-    """
-    
-    # Generate tf dataset from high res video paths.
-    dataset = tf.data.Dataset.from_tensor_slices(image_paths)
-
-    # Prefetch the data for optimal GPU utilization.
-    AUTOTUNE = tf.data.experimental.AUTOTUNE
-
-    # apply: Applies a transformation function to the whole dataset as once. Good for functions with the same random arg.
-
-    # randomly reverse frames sequence in 1 video
-    dataset = dataset.apply(reverse)
-
-    # image paths to tensor
-    dataset = dataset.map(parse_image, num_parallel_calls=AUTOTUNE)
-
-    # randomly crop frame
-    dataset = dataset.apply(random_crop_resize)
-
-    # randomly flip all frames in 1 video
-    dataset = dataset.apply(flip)
-
-    # Generate low resolution by downsampling.
-    dataset = dataset.apply(high_low_res_pairs)
-
-    # Rescale the values in the input
-    dataset = dataset.map(rescale, num_parallel_calls=AUTOTUNE)
-
-    # Batch the input, drop remainder to get a defined batch size.
-    dataset = dataset.batch(batch_size, drop_remainder=True).prefetch(AUTOTUNE)
-
-    return dataset
-
-# In[16]:
-
-# ## 2.2. Validation + Test Dataset Pipeline
-
-# In[18]:
-
-
-# 1 image as 1 element
-def val_low_res(ds):
-    """
-    Function that generates a low resolution image given the high resolution image with random methods.
-    Listed methods: ['bilinear', 'lanczos3', 'lanczos5', 'bicubic', 'gaussian', 'nearest', 'area', 'mitchellcubic']
-    Default downsampling factor is 4x.
-    Args:
-        ds: A tf dataset.
-    Returns:
-        ds: A tf dataset with low and high res images.
-    """
-    method_list = ['bilinear', 'lanczos3', 'lanczos5', 'bicubic', 'gaussian', 'nearest', 'area', 'mitchellcubic']
-    downsampling_method = random.choice(method_list)
-    
-    def downsampling(high_res):
-        """
-        Function that generates a low resolution image given the high resolution image.
-        Args:
-            high_res: A tf tensor of the high res image.
-        Returns:
-            low_res: A tf tensor of the low res image.
-            high_res: A tf tensor of the high res image.
-        """
-#         print(tf.shape(high_res)[0])
-        low_res = tf.image.resize(high_res, 
-                                  [lr_height, lr_width],
-                                  preserve_aspect_ratio=True,
-                                  method=downsampling_method)   
-        return low_res
-    
-    ds = ds.map(downsampling, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    
-    return ds
-
-
-def val_dataset(image_paths, batch_size=2):
-    """
-    Returns a tf dataset object with specified mappings. No shuffle and repeat.
-    Args:
-        image_paths: Str, Path to images.
-        batch_size: Int, The number of elements in a batch returned by the dataset.
-    Returns:
-        dataset: A tf dataset object.
-    """
-    
-    # Generate tf dataset from high res video paths.
-    dataset = tf.data.Dataset.from_tensor_slices(image_paths)
-
-    # Prefetch the data for optimal GPU utilization.
-    AUTOTUNE = tf.data.experimental.AUTOTUNE
-
-    # image paths to tensor
-    dataset = dataset.map(parse_image, num_parallel_calls=AUTOTUNE)
-    
-    # Generate low resolution by downsampling.
-    dataset = dataset.apply(val_low_res)
-
-    # Batch the input, drop remainder to get a defined batch size.
-    dataset = dataset.batch(batch_size, drop_remainder=True).prefetch(AUTOTUNE)
-
-    return dataset
-
-
-# In[19]:
-
-
-val_dataset = val_dataset(val_image_30fps_paths, batch_size=2)
-# sample_val_dataset = val_dataset(val_image_30fps_paths[:90], batch_size=2)
-
-#  test_dataset = val_dataset(test_image_15fps_paths)
-
+train_dataset = data_loader.train_dataset(train_image_30fps_paths)
 
 # # 3. Models
 
@@ -870,14 +519,6 @@ def train(gen_model, disc_model, dataset, writer, log_iter=200):
 
 # New Training
 
-# utilize the multiple GPUs
-# strategy = tf.distribute.MirroredStrategy()
-# with strategy.scope():
-    
-batch_size = 9
-
-train_dataset = dataset(train_image_30fps_paths, batch_size=batch_size)
-
 with tf.device('/device:GPU:1'):
 
     # Define the directory for saving pretrainig loss tensorboard summary.
@@ -915,8 +556,8 @@ for _ in range(epochs):
             train_image_30fps_paths.append(os.path.join(video_path, x))
 
     # recreate dataset every epoch to lightly augment the frames. ".repeat()" in dataset pipeline function does not help.
-    train_dataset = dataset(train_image_30fps_paths, batch_size=batch_size)
-    # sample_train_dataset = dataset(train_image_30fps_paths[:180], batch_size=batch_size)
+    train_dataset = data_loader.train_dataset(train_image_30fps_paths)
+    # sample_train_dataset = data_loader.train_dataset(train_image_30fps_paths[:180])
 
     with tf.device('/device:GPU:1'):
         train(gen_model, disc_model, train_dataset, train_summary_writer, log_iter=200)
