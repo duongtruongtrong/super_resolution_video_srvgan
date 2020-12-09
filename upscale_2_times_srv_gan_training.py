@@ -12,6 +12,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
+import random
+
 # https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth
 # https://leimao.github.io/blog/TensorFlow-cuDNN-Failure/
 gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -37,22 +39,31 @@ if gpus:
 
 # In[2]:
 
+# In[2]:
+
 train_30fps_dir = os.path.join(*['data', 'REDS_VTSR', 'train', 'train_30fps'])
 # print(train_30fps_dir)
 
+val_30fps_dir = os.path.join(*['data', 'REDS_VTSR', 'val', 'val_30fps'])
+# print(val_30fps_dir)
+
+test_15fps_dir = os.path.join(*['data', 'REDS_VTSR', 'test', 'test_15fps'])
+# print(test_15fps_dir)
 
 # In[3]:
 
 train_30fps_dir = [os.path.join(train_30fps_dir, p) for p in os.listdir(train_30fps_dir)]
 # print('Train 30fps', train_30fps_dir[:2])
 
+val_30fps_dir = [os.path.join(val_30fps_dir, p) for p in os.listdir(val_30fps_dir)]
+# print('Val 30fps', val_30fps_dir[:2])
+
+test_15fps_dir = [os.path.join(test_15fps_dir, p) for p in os.listdir(test_15fps_dir)]
+# print('Val 15fps', test_15fps_dir[:2])
+
 # ## 1.2. Randomize Videos Paths
-
-# In[7]:
-
-import random
-# random.shuffle(train_30fps_dir) # make the training dataset random
-# # random.shuffle(train_60fps_dir) # make the training dataset random
+# random choose 180 videos from train_30fps_dir to limit the overfitting of that dataset.
+train_30fps_dir = random.sample(train_30fps_dir, 180) + val_30fps_dir + test_15fps_dir
 
 # # ## 1.3. Get Image Paths
 
