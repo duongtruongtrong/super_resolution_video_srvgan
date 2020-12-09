@@ -1,0 +1,149 @@
+import tensorflow as tf
+from tensorflow import keras
+
+class Model():
+    def __init__(self, hr_shape, lr_shape, filters_num=32, residual_block_num=5):
+        self.hr_shape = hr_shape
+        self.lr_shape = lr_shape
+
+        # number of filters for conv2D layers in generator and discriminator models
+        self.filters = filters_num
+
+        self.residual_block_num = residual_block_num
+
+    def build_generator(self):
+        """Build the generator that will do the Super Resolution task.
+        Based on the Mobilenet design. Idea from Galteri et al."""
+
+        def make_divisible(v, divisor, min_value=None):
+                if min_value is None:
+                    min_value = divisor
+                new_v = max(min_value, int(v + divisor / 2) // divisor * divisor)
+                # Make sure that round down does not go down by more than 10%.
+                if new_v < 0.9 * v:
+                    new_v += divisor
+                return new_v
+
+        def residual_block(inputs, filters, block_id, expansion=6, stride=1, alpha=1.0):
+            """Inverted Residual block that uses depth wise convolutions for parameter efficiency.
+            Args:
+                inputs: The input feature map.
+                filters: Number of filters in each convolution in the block.
+                block_id: An integer specifier for the id of the block in the graph.
+                expansion: Channel expansion factor.
+                stride: The stride of the convolution.
+                alpha: Depth expansion factor.
+            Returns:
+                x: The output of the inverted residual block.
+            """
+            channel_axis = 1 if keras.backend.image_data_format() == 'channels_first' else -1
+
+            in_channels = keras.backend.int_shape(inputs)[channel_axis]
+            pointwise_conv_filters = int(filters * alpha)
+            pointwise_filters = make_divisible(pointwise_conv_filters, 8)
+            x = inputs
+            prefix = 'block_{}_'.format(block_id)
+
+            if block_id:
+                # Expand
+                x = keras.layers.Conv2D(expansion * in_channels, kernel_size=1, padding='same', use_bias=True, activation=None,
+                                        name=prefix + 'expand')(x)
+                x = keras.layers.BatchNormalization(axis=channel_axis, epsilon=1e-3, momentum=0.999,
+                                                    name=prefix + 'expand_BN')(x)
+                x = keras.layers.Activation('relu', name=prefix + 'expand_relu')(x)
+            else:
+                prefix = 'expanded_conv_'
+
+            # Depthwise
+            x = keras.layers.DepthwiseConv2D(kernel_size=3, strides=stride, activation=None, use_bias=True, padding='same' if stride == 1 else 'valid',
+                                            name=prefix + 'depthwise')(x)
+            x = keras.layers.BatchNormalization(axis=channel_axis, epsilon=1e-3, momentum=0.999,
+                                                name=prefix + 'depthwise_BN')(x)
+
+            x = keras.layers.Activation('relu', name=prefix + 'depthwise_relu')(x)
+
+            # Project
+            x = keras.layers.Conv2D(pointwise_filters, kernel_size=1, padding='same', use_bias=True, activation=None,
+                                    name=prefix + 'project')(x)
+            x = keras.layers.BatchNormalization(axis=channel_axis, epsilon=1e-3, momentum=0.999,
+                                                name=prefix + 'project_BN')(x)
+
+            if in_channels == pointwise_filters and stride == 1:
+                return keras.layers.Add(name=prefix + 'add')([inputs, x])
+            return x
+
+        def deconv2d(layer_input):
+            """Upsampling layer to increase height and width of the input.
+            Uses Conv2DTranspose for upsampling.
+            Args:
+                layer_input: The input tensor to upsample.
+            Returns:
+                u: Upsampled input by a factor of 2.
+            """
+            
+            u = keras.layers.Conv2DTranspose(self.filters, kernel_size=3, strides=2, padding="SAME")(layer_input)
+            
+            u = keras.layers.PReLU(shared_axes=[1, 2])(u)
+            return u
+
+        # Low resolution image input
+        img_lr = keras.Input(shape=self.lr_shape)
+
+        # Pre-residual block
+        c1 = keras.layers.Conv2D(self.filters, kernel_size=3, strides=1, padding='same')(img_lr)
+        c1 = keras.layers.BatchNormalization()(c1)
+        c1 = keras.layers.PReLU(shared_axes=[1, 2])(c1)
+
+        # Propogate through residual blocks
+        r = residual_block(c1, self.filters, 0)
+        
+        # Number of inverted residual blocks in the mobilenet generator    
+        for idx in range(1, self.residual_block_num + 1):
+            r = residual_block(r, self.filters, idx)
+
+        # Post-residual block
+        c2 = keras.layers.Conv2D(self.filters, kernel_size=3, strides=1, padding='same')(r)
+        c2 = keras.layers.BatchNormalization()(c2)
+        c2 = keras.layers.Add()([c2, c1])
+
+        u1 = deconv2d(c2)
+
+        # Generate high resolution output
+        gen_hr = keras.layers.Conv2D(3, kernel_size=3, strides=1, padding='same', activation='tanh')(u1)
+
+        return keras.models.Model(img_lr, gen_hr)
+
+    # ## 3.2. Discriminator Model
+    def build_discriminator(self):
+        """Builds a discriminator network based on the SRGAN design."""
+
+        def d_block(layer_input, filters, strides=1, bn=True):
+            """Discriminator layer block.
+            Args:
+                layer_input: Input feature map for the convolutional block.
+                filters: Number of filters in the convolution.
+                strides: The stride of the convolution.
+                bn: Whether to use batch norm or not.
+            """
+            d = keras.layers.Conv2D(filters, kernel_size=3, strides=strides, padding='same')(layer_input)
+            if bn:
+                d = keras.layers.BatchNormalization(momentum=0.8)(d)
+            d = keras.layers.LeakyReLU(alpha=0.2)(d)
+
+            return d
+
+        # Input img
+        d0 = keras.layers.Input(shape=self.hr_shape)
+
+        d1 = d_block(d0, self.filters, bn=False)
+        d2 = d_block(d1, self.filters, strides=2)
+        d3 = d_block(d2, self.filters)
+        d4 = d_block(d3, self.filters, strides=2)
+        d5 = d_block(d4, self.filters * 2)
+        d6 = d_block(d5, self.filters * 2, strides=2)
+        d7 = d_block(d6, self.filters * 2)
+        d8 = d_block(d7, self.filters * 2, strides=2)
+
+        validity = keras.layers.Conv2D(1, kernel_size=1, strides=1, activation='sigmoid', padding='same', name='disc_output_layer')(d8)
+
+        return keras.models.Model(d0, validity)
