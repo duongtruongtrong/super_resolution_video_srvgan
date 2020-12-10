@@ -87,14 +87,14 @@ models = Model(hr_shape, lr_shape, filters_num=32, residual_block_num=5)
 gen_model = models.build_generator()
 disc_model = models.build_discriminator()
 
-logs_folder_name = 'upscale_2_times_logs'
+logs_folder_name = 'light_upscale_2_times_logs'
 
-gen_model_save_path = 'models/generator_upscale_2_times.h5'
-disc_model_save_path = 'models/discriminator_upscale_2_times.h5'
+gen_model_save_path = 'models/light_generator_upscale_2_times.h5'
+disc_model_save_path = 'models/light_discriminator_upscale_2_times.h5'
 
 # # 4. Train Dataset Pipeline
 
-train_30fps_dir = random.sample(train_30fps_dir, 10)
+# train_30fps_dir = random.sample(train_30fps_dir, 10)
 
 random.shuffle(train_30fps_dir)
 train_image_30fps_paths = []
@@ -119,17 +119,17 @@ with tf.device('/device:GPU:1'):
     
     # Run pre-training.
 
-    training.pretrain_generator(train_dataset, pretrain_summary_writer, log_iter=200)
+    training.pretrain_generator(train_dataset, pretrain_summary_writer, log_iter=10)
     gen_model.save(gen_model_save_path)
     
     # Define the directory for saving the SRGAN training tensorbaord summary.
     train_summary_writer = tf.summary.create_file_writer(f'{logs_folder_name}/train')
 
-    epochs = 10 # Turn on Turbo mode
-    # speed: 14 min/epoch
+epochs = 10 # Turn on Turbo mode
+# speed: 14 min/epoch
 
-    # training history: 
-    # 10 epochs (first): 2 hours
+# training history: 
+# 10 epochs (first): 2 hours
     
 # Run training.
 for _ in range(epochs):
@@ -150,10 +150,10 @@ for _ in range(epochs):
     # sample_train_dataset = data_loader.train_dataset(train_image_30fps_paths[:180])
 
     with tf.device('/device:GPU:1'):
-        training.train(train_dataset, train_summary_writer, log_iter=200)
+        training.train(train_dataset, train_summary_writer, log_iter=10)
         
 # import os
-import time
-print('Shutting Down!!!')
-time.sleep(10)
-os.system('shutdown /p /f')
+# import time
+# print('Shutting Down!!!')
+# time.sleep(10)
+# os.system('shutdown /p /f')

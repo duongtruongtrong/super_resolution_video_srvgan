@@ -321,7 +321,7 @@ def dataset(image_paths, batch_size=2):
 
 
 hr_shape = (hr_height, hr_width, 3)
-lr_shape = (lr_height, lr_width, 3)
+# lr_shape = (lr_height, lr_width, 3)
 
 
 # In[21]:
@@ -379,7 +379,8 @@ def feature_loss(hr, sr):
 
 
 # Define a learning rate decay schedule.
-lr = 1e-3 * 0.95 ** ((75 * 1200) // 100000)
+lr = 1e-3 
+# * 0.95 ** ((75 * 1200) // 100000)
 # print(lr)
 
 gen_schedule = keras.optimizers.schedules.ExponentialDecay(
@@ -570,16 +571,20 @@ gen_model = tf.keras.models.load_model('models/generator_upscale_2_times.h5')
 # Define the directory for saving the SRGAN training tensorbaord summary.
 train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
-epochs = 40 # Turn on Turbo mode
+epochs = 8 # Turn on Turbo mode
 # speed: 14 min/epoch
 
-# training history: total 75
+# training history: total 155, 32 hours
 # 10 epochs (first): 2 hours
 # 10 epochs: 2 hours
 # 7 epochs: 1.5 hours
 # 8 epochs: 1.5 hours
 # 30 epochs: 6.5 hours
 # 10 epochs: 2 hours
+# 40 epochs: 8 hours
+# 8 epochs (with new data): 1.7 hours
+# 2 epochs: 0.3 hours
+# 30 epochs: 6.5 hours
 
 batch_size = 9
 
@@ -605,6 +610,7 @@ for _ in range(epochs):
         train(gen_model, disc_model, train_dataset, train_summary_writer, log_iter=200)
 
 # import os
+print('Shutting Down!!!')
 import time
 time.sleep(10)
 os.system('shutdown /p /f')

@@ -154,7 +154,7 @@ def upscale_frame():
             # opencv image to tensorflow image
             tensor_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            tensor_image = tf.image.convert_image_dtype(tensor_image, tf.float32)
+            tensor_image = tf.image.convert_image_dtype(tensor_image, tf.float16)
 
             tensor_image_gen = tf.expand_dims(tensor_image, axis=0)
 
@@ -175,8 +175,8 @@ def upscale_frame():
             tensor_image_gen = cv2.putText(tensor_image_gen, 'FPS: ' + str(fps), (10, tensor_image_gen.shape[0] - 10),
                                             cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3)
 
-            # predict_time 
-            # 0.08 second/frame, 2 times upscale: 320x180 -> 640x360
+            # # predict_time 
+            # # 0.08 second/frame, 2 times upscale: 320x180 -> 640x360
             # duration_pred = round(end - start_pred, 3)
             # tensor_image_gen = cv2.putText(tensor_image_gen, 'SPF: ' + str(duration_pred), (10, 30),
             #                                 cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3)
@@ -206,7 +206,7 @@ def upscale_4x_frame():
             # opencv image to tensorflow image
             tensor_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            tensor_image = tf.image.convert_image_dtype(tensor_image, tf.float32)
+            tensor_image = tf.image.convert_image_dtype(tensor_image, tf.float16)
 
             tensor_image_gen = tf.expand_dims(tensor_image, axis=0)
 
