@@ -63,7 +63,7 @@ test_15fps_dir = [os.path.join(test_15fps_dir, p) for p in os.listdir(test_15fps
 
 # ## 1.2. Randomize Videos Paths
 # random choose 180 videos from train_30fps_dir to limit the overfitting of that dataset.
-train_30fps_dir = random.sample(train_30fps_dir, 180) + val_30fps_dir + test_15fps_dir
+train_30fps_dir = random.sample(train_30fps_dir, 60) + val_30fps_dir + test_15fps_dir
 
 # # ## 1.3. Get Image Paths
 
@@ -391,7 +391,7 @@ gen_schedule = keras.optimizers.schedules.ExponentialDecay(
 )
 
 disc_schedule = keras.optimizers.schedules.ExponentialDecay(
-    lr * 5,  # TTUR - Two Time Scale Updates
+    lr, # * 5  # TTUR - Two Time Scale Updates
     decay_steps=100000,
     decay_rate=0.95, # 95%
     staircase=True
@@ -571,10 +571,10 @@ gen_model = tf.keras.models.load_model('models/generator_upscale_2_times.h5')
 # Define the directory for saving the SRGAN training tensorbaord summary.
 train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
-epochs = 8 # Turn on Turbo mode
+epochs = 16 # Turn on Turbo mode
 # speed: 14 min/epoch
 
-# training history: total 155, 32 hours
+# training history: total 188, 39.2 hours
 # 10 epochs (first): 2 hours
 # 10 epochs: 2 hours
 # 7 epochs: 1.5 hours
@@ -585,6 +585,8 @@ epochs = 8 # Turn on Turbo mode
 # 8 epochs (with new data): 1.7 hours
 # 2 epochs: 0.3 hours
 # 30 epochs: 6.5 hours
+# 8 epochs: 1.5 hours
+# 50 epochs (120 videos only: 30 val + 30 test + 60 train): 5.7 hours ~ 25 epochs with full dataset (240 videos)
 
 batch_size = 9
 

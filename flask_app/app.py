@@ -1,4 +1,4 @@
-from flask import Flask, render_template, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response
  
 import tensorflow as tf
 
@@ -23,10 +23,6 @@ if gpus:
         print(e)
 
 import numpy as np
-import re
-import os
-import base64
-import uuid
 from cv2 import cv2
 
 import time
@@ -154,7 +150,7 @@ def upscale_frame():
             # opencv image to tensorflow image
             tensor_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            tensor_image = tf.image.convert_image_dtype(tensor_image, tf.float16)
+            tensor_image = tf.image.convert_image_dtype(tensor_image, tf.float32)
 
             tensor_image_gen = tf.expand_dims(tensor_image, axis=0)
 
@@ -162,6 +158,13 @@ def upscale_frame():
             tensor_image_gen = model.predict(tensor_image_gen)
 
             tensor_image_gen = tf.cast(255 * (tensor_image_gen + 1.0) / 2.0, tf.uint8)
+
+            # tensor_image_gen = tf.image.convert_image_dtype(tensor_image_gen, tf.float32)
+
+            # tensor_image_gen = model.predict(tensor_image_gen)
+
+            # tensor_image_gen = tf.cast(255 * (tensor_image_gen + 1.0) / 2.0, tf.uint8)
+
 
             # tensor to opencv image
             tensor_image_gen = cv2.cvtColor(tensor_image_gen[0].numpy(), cv2.COLOR_RGB2BGR)
@@ -206,7 +209,7 @@ def upscale_4x_frame():
             # opencv image to tensorflow image
             tensor_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            tensor_image = tf.image.convert_image_dtype(tensor_image, tf.float16)
+            tensor_image = tf.image.convert_image_dtype(tensor_image, tf.float32)
 
             tensor_image_gen = tf.expand_dims(tensor_image, axis=0)
 
