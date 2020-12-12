@@ -571,10 +571,10 @@ gen_model = tf.keras.models.load_model('models/generator_upscale_2_times.h5')
 # Define the directory for saving the SRGAN training tensorbaord summary.
 train_summary_writer = tf.summary.create_file_writer('upscale_2_times_logs/train')
 
-epochs = 16 # Turn on Turbo mode
+epochs = 60 # Turn on Turbo mode
 # speed: 14 min/epoch
 
-# training history: total 188, 39.2 hours
+# training history: total 227, 48 hours
 # 10 epochs (first): 2 hours
 # 10 epochs: 2 hours
 # 7 epochs: 1.5 hours
@@ -587,6 +587,9 @@ epochs = 16 # Turn on Turbo mode
 # 30 epochs: 6.5 hours
 # 8 epochs: 1.5 hours
 # 50 epochs (120 videos only: 30 val + 30 test + 60 train): 5.7 hours ~ 25 epochs with full dataset (240 videos)
+# 18 epochs: 2 hours ~ 9 epochs with full dataset (240 videos)
+# 60 epochs: 6.8 hours ~ 30 epcochs with full dataset (240 videos)
+# Stop training
 
 batch_size = 9
 
