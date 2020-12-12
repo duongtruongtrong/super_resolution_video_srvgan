@@ -5,31 +5,22 @@
     <div class="row">
         <div class="col">
             <div class="col-lg-8  offset-lg-2"></div>
-                <h1>Comparision Upscale 2x</h1>
+                <h1>Comparision 2x Upscale</h1>
             </div>
-        </div>
-    </div>
-
-    <div class="row justify-content-center">
-        <div class="col-2">
-            <a class="btn btn-primary" href="/" role="button">Home</a>
-        </div>
-        <div class="col-2">
-            <a class="btn btn-danger" href="/upscale_4x_page" role="button">4x Upscale</a>
         </div>
     </div>
 
     <div class="row">
 
         <div class="col">
-            <div class="col-lg-8  offset-lg-2">
+            <div class="col-lg-12">
                 <h3 class="mt-5">Low Res Input (320x180)</h3>
                 <img src="{{ url_for('video_feed') }}" width="100%">
             </div>
         </div>
 
         <div class="col">
-            <div class="col-lg-8  offset-lg-2">
+            <div class="col-lg-12">
                 <h3 class="mt-5">Generated High Res (640x360)</h3>
                 <img src="{{ url_for('upscale') }}" width="100%">
             </div>
@@ -40,14 +31,14 @@
     <div class="row">
 
         <div class="col">
-            <div class="col-lg-8  offset-lg-2">
+            <div class="col-lg-12">
                 <h3 class="mt-5">Resized High Res (640x360)</h3>
                 <img src="{{ url_for('test_upscale') }}" width="100%">
             </div>
         </div>
 
         <div class="col">
-            <div class="col-lg-8  offset-lg-2">
+            <div class="col-lg-12">
                 <h3 class="mt-5">Original High Res (640x360)</h3>
                 <img src="{{ url_for('high_res') }}" width="100%">
             </div>

@@ -5,41 +5,37 @@
     <div class="row">
         <div class="col">
             <div class="col-lg-8  offset-lg-2"></div>
-                <h1>Video Upscale 2x</h1>
+                <h1>Video Upload</h1>
+                <h3>2x Upscale</h3>
             </div>
         </div>
     </div>
-    
-    <div class="row justify-content-center">
-        <div class="col-2">
-            <a class="btn btn-primary" href="/comparision" role="button">Comparision</a>
-        </div>
-        <div class="col-2">
-            <a class="btn btn-danger" href="/upscale_4x_page" role="button">4x Upscale</a>
-        </div>
-    </div>
-
-    <div class="row">
-
-        <div class="col">
-            <div class="col-lg-8  offset-lg-2">
-                <h3 class="mt-5">Low Res Input (320x180)</h3>
-                <img src="{{ url_for('video_feed') }}" width="100%">
-            </div>
-        </div>
-
-    </div>
-
-    <div class="row">
-
-        <div class="col">
-            <div class="col-lg-8  offset-lg-2">
-                <h3 class="mt-5">Generated High Res (640x360)</h3>
-                <img src="{{ url_for('upscale') }}" width="100%">
-            </div>
-        </div>
-
-    </div>
-
 </div>
+
+<!-- https://getbootstrap.com/docs/4.5/components/forms/#file-browser -->
+<!-- https://www.tutorialspoint.com/flask/flask_file_uploading.htm -->
+<div class="col-lg-8 offset-lg-2">
+    <div class="card">
+        <div class="card-body">
+            <form action = "/upload" method = "POST" enctype = "multipart/form-data">
+                <label for="video-file">Select a video</label>
+                <input type="file" class="form-control-file" id="video-file" name="file">
+                <button type="submit" class="btn btn-md btn-danger">Submit</button>
+                <!-- <div class="custom-file">
+                    <input type="file" class="custom-file-input" id="video-file" name="file">
+                    <label class="custom-file-label" for="customFileLang">Select a video...</label>
+                    <input type=submit value=Submit>
+                </div> -->
+            </form>
+        </div>
+    </div>
+</div>
+
+{% if video_name != null %}
+    <video width="1280" height="720" controls>
+        <!-- can only play video in static folder -->
+        <source src={{ url_for('static', filename=video_name) }} type="video/mp4">
+    </video>
+{% endif %}
+
 {% endblock %}

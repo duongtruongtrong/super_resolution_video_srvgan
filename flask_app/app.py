@@ -2,6 +2,10 @@ from flask import Flask, render_template, request, jsonify, Response
  
 import tensorflow as tf
 
+from werkzeug.utils import secure_filename
+
+import os
+
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
     # Restrict TensorFlow to only allocate 1GB of memory on the first GPU
@@ -28,7 +32,7 @@ from cv2 import cv2
 import time
 
 #Initialize the Flask app
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 
 # https://www.pyimagesearch.com/2019/09/02/opencv-stream-video-to-web-browser-html-page/
 
@@ -278,6 +282,36 @@ def test_upscale_frame():
 @app.route('/')
 def index():
     return render_template('home_page.html')
+
+# https://flask.palletsprojects.com/en/1.1.x/patterns/fileuploads/
+# https://www.tutorialspoint.com/flask/flask_file_uploading.htm
+
+# video must be in static folder
+UPLOAD_FOLDER = 'E:/CoderSchool_Final_Project/super_resolution_video/flask_app/static'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+@app.route('/upload', methods = ['POST'])
+def upload():
+    file = request.files['file']
+
+    filename = secure_filename(file.filename)
+    path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(path)
+
+    # video = cv2.VideoCapture(data)
+    # _, frame = camera.read()  # read the camera frame
+    # _, buffer = cv2.imencode('.jpg', frame)
+
+    # frame = buffer.tobytes()
+    # print(data)
+    
+    # yield (b'--frame\r\n'
+    #        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
+    return render_template('home_page.html', video_name = filename, video_path = path)
+
+@app.route('/webcam')
+def webcam():
+    return render_template('webcam.html')
 
 @app.route('/comparision')
 def comparision():
