@@ -3,39 +3,82 @@
 <!-- Your code here -->
 <div class="container">
     <div class="row">
-        <div class="col">
-            <div class="col-lg-8  offset-lg-2"></div>
-                <h1>Video Upload</h1>
-                <h3>2x Upscale</h3>
-            </div>
+        <div class="col-lg-8  offset-lg-2">
+            <h1>Video Upload</h1>
+            <h3>2x Upscale</h3>
         </div>
     </div>
 </div>
 
 <!-- https://getbootstrap.com/docs/4.5/components/forms/#file-browser -->
 <!-- https://www.tutorialspoint.com/flask/flask_file_uploading.htm -->
-<div class="col-lg-8 offset-lg-2">
+<div class="col-lg-4 offset-lg-4">
     <div class="card">
         <div class="card-body">
             <form action = "/upload" method = "POST" enctype = "multipart/form-data">
                 <label for="video-file">Select a video</label>
                 <input type="file" class="form-control-file" id="video-file" name="file">
-                <button type="submit" class="btn btn-md btn-danger">Submit</button>
-                <!-- <div class="custom-file">
-                    <input type="file" class="custom-file-input" id="video-file" name="file">
-                    <label class="custom-file-label" for="customFileLang">Select a video...</label>
-                    <input type=submit value=Submit>
-                </div> -->
+                <button type="submit" class="btn btn-md btn-success m-1">Upload Video</button>
             </form>
+            <a href= "/upscale" class="btn btn-md btn-danger m-1">2x Upscale</a>
         </div>
     </div>
 </div>
 
-{% if video_name != null %}
-    <video width="1280" height="720" controls>
-        <!-- can only play video in static folder -->
-        <source src={{ url_for('static', filename=video_name) }} type="video/mp4">
-    </video>
+{% if upscale_video_name != null %}
+    <h2>Upscale Speed: {{upscale_speed}} second/frame</h2>
+    <h2>Upscale Duration: {{duration}} seconds / Number of Frames: {{frame_count}}</h2>
 {% endif %}
+
+<div class="row">
+{% if upscale_video_name != null %}
+    
+    {% if upscale_video_width >= upscale_video_height %}
+        <h3>Upscaled Video FPS: {{video_fps}} - Resolution: {{upscale_video_width}} x {{upscale_video_height}}</h3>
+        <!-- horizontal video -->
+        <video width="1280" height="720" controls autoplay loop>
+            <!-- can only play video in static folder -->
+            <source src="{{ url_for('static', filename=upscale_video_name) }}" type="video/mp4">
+        </video>
+    {% else %}
+    <div class="col">
+        <div class="col-lg-13">
+            <h3>Upscaled Video FPS: {{video_fps}} - Resolution: {{upscale_video_width}} x {{upscale_video_height}}</h3>
+            <!-- verticle video -->
+            <video width="360" height="640" controls autoplay loop>
+                <!-- can only play video in static folder -->
+                <source src="{{ url_for('static', filename=upscale_video_name) }}" type="video/mp4">
+            </video>
+        </div>
+    </div>
+    {% endif %}
+
+{% endif %}
+
+{% if video_name != null %}
+    
+    {% if video_width >= video_height %}
+        <h3>Original Video FPS: {{video_fps}} - Resolution: {{video_width}} x {{video_height}}</h3>
+        <!-- horizontal video -->
+        <video width="1280" height="720" controls autoplay loop>
+            <!-- can only play video in static folder -->
+            <source src="{{ url_for('static', filename=video_name) }}" type="video/mp4">
+        </video>
+    {% else %}
+    <div class="col">
+        <div class="col-lg-13">
+            <h3>Original Video FPS: {{video_fps}} - Resolution: {{video_width}} x {{video_height}}</h3>
+            <!-- verticle video -->
+            <video width="360" height="640" controls autoplay loop>
+                <!-- can only play video in static folder -->
+                <source src="{{ url_for('static', filename=video_name) }}" type="video/mp4">
+            </video>
+        </div>
+    </div>
+    {% endif %}
+
+{% endif %}
+
+</div>
 
 {% endblock %}

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, redirect, url_for
  
 import tensorflow as tf
 
@@ -30,6 +30,8 @@ import numpy as np
 from cv2 import cv2
 
 import time
+
+from threading import Thread
 
 #Initialize the Flask app
 app = Flask(__name__, static_folder='static')
@@ -110,7 +112,7 @@ def webcam_low_res():
 
         frame = buffer.tobytes()
         yield (b'--frame\r\n'
-                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
 
 def webcam_high_res():
     frame_num = 1
@@ -135,7 +137,7 @@ def webcam_high_res():
 
         frame = buffer.tobytes()
         yield (b'--frame\r\n'
-                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
 
 # use batch failed -> even slower without batch
 def upscale_frame():
@@ -152,26 +154,26 @@ def upscale_frame():
             frame = cv2.resize(frame, (resize_width, resize_height), interpolation=cv2.INTER_AREA)
             
             # opencv image to tensorflow image
-            tensor_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            tensor_image = tf.image.convert_image_dtype(tensor_image, tf.float32)
+            frame = tf.image.convert_image_dtype(frame, tf.float32)
 
-            tensor_image_gen = tf.expand_dims(tensor_image, axis=0)
+            frame = tf.expand_dims(frame, axis=0)
 
         
-            tensor_image_gen = model.predict(tensor_image_gen)
+            frame = model.predict(frame)
 
-            tensor_image_gen = tf.cast(255 * (tensor_image_gen + 1.0) / 2.0, tf.uint8)
+            frame = tf.cast(255 * (frame + 1.0) / 2.0, tf.uint8)
 
-            # tensor_image_gen = tf.image.convert_image_dtype(tensor_image_gen, tf.float32)
+            # frame = tf.image.convert_image_dtype(frame, tf.float32)
 
-            # tensor_image_gen = model.predict(tensor_image_gen)
+            # frame = model.predict(frame)
 
-            # tensor_image_gen = tf.cast(255 * (tensor_image_gen + 1.0) / 2.0, tf.uint8)
+            # frame = tf.cast(255 * (frame + 1.0) / 2.0, tf.uint8)
 
 
             # tensor to opencv image
-            tensor_image_gen = cv2.cvtColor(tensor_image_gen[0].numpy(), cv2.COLOR_RGB2BGR)
+            frame = cv2.cvtColor(frame[0].numpy(), cv2.COLOR_RGB2BGR)
             
             # FPS
             end = time.time()
@@ -179,22 +181,22 @@ def upscale_frame():
             fps = round(frame_num/duration, 2) 
             # 7 fps, 2 times upscale: 320x180 -> 640x360
 
-            tensor_image_gen = cv2.putText(tensor_image_gen, 'FPS: ' + str(fps), (10, tensor_image_gen.shape[0] - 10),
+            frame = cv2.putText(frame, 'FPS: ' + str(fps), (10, frame.shape[0] - 10),
                                             cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3)
 
             # # predict_time 
             # # 0.08 second/frame, 2 times upscale: 320x180 -> 640x360
             # duration_pred = round(end - start_pred, 3)
-            # tensor_image_gen = cv2.putText(tensor_image_gen, 'SPF: ' + str(duration_pred), (10, 30),
+            # frame = cv2.putText(frame, 'SPF: ' + str(duration_pred), (10, 30),
             #                                 cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3)
 
             frame_num += 1
 
-            _, buffer = cv2.imencode('.jpg', tensor_image_gen)
+            _, buffer = cv2.imencode('.jpg', frame)
 
             frame = buffer.tobytes()
             yield (b'--frame\r\n'
-                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
 
 def upscale_4x_frame():
 
@@ -211,26 +213,26 @@ def upscale_4x_frame():
             
             # frame = cv2.resize(frame, (width // 2, height // 2))
             # opencv image to tensorflow image
-            tensor_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            tensor_image = tf.image.convert_image_dtype(tensor_image, tf.float32)
+            frame = tf.image.convert_image_dtype(frame, tf.float32)
 
-            tensor_image_gen = tf.expand_dims(tensor_image, axis=0)
+            frame = tf.expand_dims(frame, axis=0)
 
-            # tensor_image_gen = model.predict(tensor_image_gen)
+            # frame = model.predict(frame)
 
-            # tensor_image_gen = tf.cast(255 * (tensor_image_gen + 1.0) / 2.0, tf.uint8)
+            # frame = tf.cast(255 * (frame + 1.0) / 2.0, tf.uint8)
 
-            # tensor_image_gen = tf.image.convert_image_dtype(tensor_image_gen, tf.float32)
+            # frame = tf.image.convert_image_dtype(frame, tf.float32)
 
             # model_4x
-            tensor_image_gen = model_4x.predict(tensor_image_gen)
-            # tensor_image_gen = model.predict(tensor_image_gen)
+            frame = model_4x.predict(frame)
+            # frame = model.predict(frame)
 
-            tensor_image_gen = tf.cast(255 * (tensor_image_gen + 1.0) / 2.0, tf.uint8)
+            frame = tf.cast(255 * (frame + 1.0) / 2.0, tf.uint8)
 
             # tensor to opencv image
-            tensor_image_gen = cv2.cvtColor(tensor_image_gen[0].numpy(), cv2.COLOR_RGB2BGR)
+            frame = cv2.cvtColor(frame[0].numpy(), cv2.COLOR_RGB2BGR)
             
             # FPS
             end = time.time()
@@ -238,22 +240,22 @@ def upscale_4x_frame():
             fps = round(frame_num/duration, 2) 
             # 5 fps, 4 times upscale: 320x180 -> 1280x720
 
-            tensor_image_gen = cv2.putText(tensor_image_gen, 'FPS: ' + str(fps), (10, tensor_image_gen.shape[0] - 10),
+            frame = cv2.putText(frame, 'FPS: ' + str(fps), (10, frame.shape[0] - 10),
                                             cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 3)
 
             # predict_time 
             # 0.11 second/frame, 4 times upscale: 320x180 -> 1280x720
             # duration_pred = round(end - start_pred, 3)
-            # tensor_image_gen = cv2.putText(tensor_image_gen, 'SPF: ' + str(duration_pred), (10, 30),
+            # frame = cv2.putText(frame, 'SPF: ' + str(duration_pred), (10, 30),
             #                                 cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3)
 
             frame_num += 1
 
-            _, buffer = cv2.imencode('.jpg', tensor_image_gen)
+            _, buffer = cv2.imencode('.jpg', frame)
 
             frame = buffer.tobytes()
             yield (b'--frame\r\n'
-                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
 
 def test_upscale_frame():
     frame_num = 1
@@ -290,43 +292,111 @@ def index():
 UPLOAD_FOLDER = 'E:/CoderSchool_Final_Project/super_resolution_video/flask_app/static'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-@app.route('/upload', methods = ['POST'])
+filename = None
+video = None
+fps = 0
+upload_width = 0
+upload_height = 0
+
+@app.route('/upload', methods=['POST'])
 def upload():
+    global filename, video, fps, upload_width, upload_height
+
     file = request.files['file']
 
     filename = secure_filename(file.filename)
     path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(path)
 
-    # video = cv2.VideoCapture(data)
-    # _, frame = camera.read()  # read the camera frame
-    # _, buffer = cv2.imencode('.jpg', frame)
+    video = cv2.VideoCapture(path)
+    fps = int(video.get(cv2.CAP_PROP_FPS))
+    upload_width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+    upload_height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    # frame = buffer.tobytes()
-    # print(data)
-    
-    # yield (b'--frame\r\n'
-    #        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
-    return render_template('home_page.html', video_name = filename, video_path = path)
+    return render_template('home_page.html', video_name=filename, video_width=upload_width, video_height=upload_height, video_fps=fps)
+
+@app.route('/upscale')
+# @app.route('/output_upscale_video')
+def output_upscale_video():
+    global filename, video, fps, upload_width, upload_height
+    start = time.time()
+    with tf.device('/device:GPU:1'):
+        # Define arbitrary spatial dims, and 3 channels.
+        inputs = tf.keras.Input((upload_height, upload_width, 3))
+
+        # Trace out the graph using the input:
+        outputs = model(inputs)
+        output_width = outputs.shape[2]
+        output_height = outputs.shape[1]
+
+        gen_model = tf.keras.models.Model(inputs, outputs)
+
+        output_filename = filename.split('.')[0] + '_upscaled.mp4'
+        path = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
+
+        # to play video on html from opencv output
+        # https://stackoverflow.com/questions/49530857/python-opencv-video-format-play-in-browser
+        # *'H264'
+        # *'DIVX'
+        # cv2.VideoWriter_fourcc(*'MPEG-4')
+        # 0x00000021
+        
+        output_video = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*'H264'), fps, (output_width, output_height))
+        
+        frame_count = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        record = True
+        
+        while record:
+            # read the next frame from the file
+            record, frame = video.read()
+
+            if record:
+
+                # opencv image to tensorflow image
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                frame = tf.image.convert_image_dtype(frame, tf.float32)
+
+                frame = tf.expand_dims(frame, axis=0)
+
+                frame = gen_model.predict(frame)
+                frame = tf.cast(255 * (frame + 1.0) / 2.0, tf.uint8)
+
+                # tensor to opencv image
+                frame = cv2.cvtColor(frame[0].numpy(), cv2.COLOR_RGB2BGR)
+
+                # save to video
+                output_video.write(frame)
+
+    video.release()
+    output_video.release()
+
+    duration = round(time.time() - start, 1)
+
+    speed = round(duration/frame_count, 4)
+
+    return render_template('home_page.html', video_name=filename, video_width=upload_width, video_height=upload_height, video_fps=fps, upscale_video_name=output_filename, upscale_video_height=output_height, upscale_video_width=output_width, duration=duration, upscale_speed=speed, frame_count=frame_count)
 
 @app.route('/webcam')
-def webcam():
-    return render_template('webcam.html')
+def upscale_2x_webcam():
+    return render_template('webcam.html', original_width=resize_width, original_height=resize_height, target_width=target_width, target_height=target_height)
 
 @app.route('/comparision')
 def comparision():
-    return render_template('comparision_page.html') 
+    return render_template('comparision_page.html', original_width=resize_width, original_height=resize_height, target_width=target_width, target_height=target_height) 
 
 @app.route('/upscale_4x_page')
-def upscale_4x_page():
-    return render_template('upscale_4x.html') 
+def upscale_4x_webcam():
+    return render_template('upscale_4x.html', original_width=resize_width, original_height=resize_height, target_width=width, target_height=height)
+
 
 @app.route('/video_feed')
 def video_feed():
     return Response(webcam_low_res(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/video_upscale')
-def upscale():
+def upscale_2x():
     return Response(upscale_frame(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/video_upscale_4x')
