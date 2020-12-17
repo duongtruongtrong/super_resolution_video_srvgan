@@ -26,28 +26,31 @@
 </div>
 
 {% if upscale_video_name != null %}
-    <h2>Upscale Speed: {{upscale_speed}} second/frame</h2>
+    <h2 class="bg-success text-white">Upscale Speed: {{upscale_speed}} second/frame</h2>
     <h2>Upscale Duration: {{duration}} seconds / Number of Frames: {{frame_count}}</h2>
 {% endif %}
 
 <div class="row">
-{% if upscale_video_name != null %}
+
+{% if video_name != null %}
     
-    {% if upscale_video_width >= upscale_video_height %}
-        <h3>Upscaled Video FPS: {{video_fps}} - Resolution: {{upscale_video_width}} x {{upscale_video_height}}</h3>
-        <!-- horizontal video -->
-        <video width="1280" height="720" controls autoplay loop>
-            <!-- can only play video in static folder -->
-            <source src="{{ url_for('static', filename=upscale_video_name) }}" type="video/mp4">
-        </video>
+    {% if video_width >= video_height %}
+        <div class="col-lg-8  offset-lg-2">
+            <h3>Original Video FPS: {{video_fps}} - Resolution: {{video_width}} x {{video_height}}</h3>
+            <!-- horizontal video -->
+            <video width="1280" height="720" controls autoplay loop>
+                <!-- can only play video in static folder -->
+                <source src="{{ url_for('static', filename=video_name) }}" type="video/mp4">
+            </video>
+        </div>
     {% else %}
     <div class="col">
         <div class="col-lg-13">
-            <h3>Upscaled Video FPS: {{video_fps}} - Resolution: {{upscale_video_width}} x {{upscale_video_height}}</h3>
+            <h3>Original Video FPS: {{video_fps}} - Resolution: {{video_width}} x {{video_height}}</h3>
             <!-- verticle video -->
-            <video width="360" height="640" controls autoplay loop>
+            <video width="720" height="1280" controls autoplay loop>
                 <!-- can only play video in static folder -->
-                <source src="{{ url_for('static', filename=upscale_video_name) }}" type="video/mp4">
+                <source src="{{ url_for('static', filename=video_name) }}" type="video/mp4">
             </video>
         </div>
     </div>
@@ -55,23 +58,25 @@
 
 {% endif %}
 
-{% if video_name != null %}
+{% if upscale_video_name != null %}
     
-    {% if video_width >= video_height %}
-        <h3>Original Video FPS: {{video_fps}} - Resolution: {{video_width}} x {{video_height}}</h3>
-        <!-- horizontal video -->
-        <video width="1280" height="720" controls autoplay loop>
-            <!-- can only play video in static folder -->
-            <source src="{{ url_for('static', filename=video_name) }}" type="video/mp4">
-        </video>
+    {% if upscale_video_width >= upscale_video_height %}
+        <div class="col-lg-8  offset-lg-2">
+            <h3 class="bg-danger text-white">Upscaled Video FPS: {{video_fps}} - Resolution: {{upscale_video_width}} x {{upscale_video_height}}</h3>
+            <!-- horizontal video -->
+            <video width="1280" height="720" controls autoplay loop>
+                <!-- can only play video in static folder -->
+                <source src="{{ url_for('static', filename=upscale_video_name) }}" type="video/mp4">
+            </video>
+        </div>
     {% else %}
     <div class="col">
         <div class="col-lg-13">
-            <h3>Original Video FPS: {{video_fps}} - Resolution: {{video_width}} x {{video_height}}</h3>
+            <h3 class="bg-danger text-white">Upscaled Video FPS: {{video_fps}} - Resolution: {{upscale_video_width}} x {{upscale_video_height}}</h3>
             <!-- verticle video -->
-            <video width="360" height="640" controls autoplay loop>
+            <video width="720" height="1280" controls autoplay loop>
                 <!-- can only play video in static folder -->
-                <source src="{{ url_for('static', filename=video_name) }}" type="video/mp4">
+                <source src="{{ url_for('static', filename=upscale_video_name) }}" type="video/mp4">
             </video>
         </div>
     </div>

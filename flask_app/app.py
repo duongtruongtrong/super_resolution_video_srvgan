@@ -50,8 +50,11 @@ camera = cv2.VideoCapture(0)
 width = 1280
 height = 720
 
-target_width = 640
-target_height = 360
+target_width = 512
+target_height = 288
+
+# target_width = 640
+# target_height = 360
 
 codec = 0x47504A4D  # MJPG
 # camera.set(cv2.CAP_PROP_FPS, 30.0)
@@ -59,7 +62,8 @@ camera.set(cv2.CAP_PROP_FOURCC, codec)
 camera.set(cv2.CAP_PROP_FRAME_WIDTH, width)
 camera.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
-resize_width, resize_height = (320, 180)
+# resize_width, resize_height = (320, 180)
+resize_width, resize_height = (256, 144)
 
 model = tf.keras.models.load_model("models/generator_upscale_2_times.h5")
 
@@ -105,7 +109,7 @@ def webcam_low_res():
         fps = round(frame_num/duration, 1) # 27 fps
 
         frame = cv2.putText(frame, 'FPS: ' + str(fps), (10, frame.shape[0] - 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
         frame_num += 1
 
         _, buffer = cv2.imencode('.jpg', frame)
@@ -130,7 +134,7 @@ def webcam_high_res():
         fps = round(frame_num/duration, 1) # 27 fps
 
         frame = cv2.putText(frame, 'FPS: ' + str(fps), (10, frame.shape[0] - 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3)
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         frame_num += 1
 
         _, buffer = cv2.imencode('.jpg', frame)
@@ -182,7 +186,7 @@ def upscale_frame():
             # 7 fps, 2 times upscale: 320x180 -> 640x360
 
             frame = cv2.putText(frame, 'FPS: ' + str(fps), (10, frame.shape[0] - 10),
-                                            cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3)
+                                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
             # # predict_time 
             # # 0.08 second/frame, 2 times upscale: 320x180 -> 640x360
@@ -241,7 +245,7 @@ def upscale_4x_frame():
             # 5 fps, 4 times upscale: 320x180 -> 1280x720
 
             frame = cv2.putText(frame, 'FPS: ' + str(fps), (10, frame.shape[0] - 10),
-                                            cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 3)
+                                            cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 2)
 
             # predict_time 
             # 0.11 second/frame, 4 times upscale: 320x180 -> 1280x720
@@ -272,7 +276,7 @@ def test_upscale_frame():
         fps = round(frame_num/duration, 1) # 27 fps
 
         frame = cv2.putText(frame, 'FPS: ' + str(fps), (10, frame.shape[0] - 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3)
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
         frame_num += 1
 
         _, buffer = cv2.imencode('.jpg', frame)
