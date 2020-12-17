@@ -45,14 +45,14 @@
         </div>
     {% else %}
     <div class="col">
-        <div class="col-lg-13">
+        <!-- <div class="col-lg-13"> -->
             <h3>Original Video FPS: {{video_fps}} - Resolution: {{video_width}} x {{video_height}}</h3>
             <!-- verticle video -->
-            <video width="720" height="1280" controls autoplay loop>
+            <video width="900" height="1600" controls autoplay loop>
                 <!-- can only play video in static folder -->
                 <source src="{{ url_for('static', filename=video_name) }}" type="video/mp4">
             </video>
-        </div>
+        <!-- </div> -->
     </div>
     {% endif %}
 
@@ -71,14 +71,14 @@
         </div>
     {% else %}
     <div class="col">
-        <div class="col-lg-13">
+        <!-- <div class="col-lg-13"> -->
             <h3 class="bg-danger text-white">Upscaled Video FPS: {{video_fps}} - Resolution: {{upscale_video_width}} x {{upscale_video_height}}</h3>
             <!-- verticle video -->
-            <video width="720" height="1280" controls autoplay loop>
+            <video width="900" height="1600" controls autoplay loop>
                 <!-- can only play video in static folder -->
                 <source src="{{ url_for('static', filename=upscale_video_name) }}" type="video/mp4">
             </video>
-        </div>
+        <!-- </div> -->
     </div>
     {% endif %}
 
