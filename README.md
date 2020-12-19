@@ -1,92 +1,87 @@
-# Super Resolution Video - Video Upscale (Work In Progress)
+# Super Resolution Video - Video Upscale - 2x SRGAN
+
+# Summary: [Slides](https://docs.google.com/presentation/d/1gQwtfkFHy1mLXXEUTjmJuWvw7kQeu_houVPvBrYJYT4/edit#slide=id.gcb9a0b074_1_0)
 Upscale video from low resolution to high resolution to reduce the effect of low bandwidth internet on video chat (meeting) or to reduce streaming video size without losing video quality.
 
-# Problem to Solve:
+## Problem to Solve:
 ![image](https://user-images.githubusercontent.com/71629218/99867213-16cff080-2bea-11eb-9d85-0ed480ec6aac.png)
 
-**Eliminate pixelated videos** in streaming, video call/chat/conference.
+**Eliminate pixelated videos** in streaming, video call/chat/conference due to poor Internet.
 
-# Idea Origin:
-**NVIDIA DLSS**
+## Solution:
+![image](https://user-images.githubusercontent.com/71629218/102676146-bb842480-41ce-11eb-8f3c-73ec7f084f4a.png)
 
-![image](https://user-images.githubusercontent.com/71629218/99867318-2c91e580-2beb-11eb-92f2-076c187e10e3.png)
+## Requirements:
+**Speed**: Real time video rendering. Target: 0.04 second/frame ~ 25 FPS (frame per second) video.
 
-Upscaling video games rendered at low resolution (e.g.: 720p) to high resolution (e.g.: 1080p) with high frame per second (FPS) and still preserve details in the image.
+**Image Quality**: Acceptable.
+
+## Result:
+### Image Quality:
+Comparison is between:
+
+- Low resolution input.
+- Sony Vegas Pro 17.0 (a software for video editing, similar to Adobe A.I.).
+- OpenCV (a python library for processing images).
+- My model.
+- The real high resolution image.
+
+![comparision](https://user-images.githubusercontent.com/71629218/102676496-677a3f80-41d0-11eb-88fd-0f4a92f31a0d.png)
+
+Image quality is acceptable.
+
+### Speed:
+Not yet reach real time rendering speed.
+
+![speed](https://user-images.githubusercontent.com/71629218/102676556-baec8d80-41d0-11eb-81e0-1a076e77a52f.png)
 
 # Project Details:
-## Dataset:
+## Datasets:
+### 1. REDS_VTSR:
 **RE**alistic and **D**ynamic **S**cenes dataset for **V**ideo **T**emporal **S**uper-**R**esolution (frame interpolation) ([REDS_VTSR](https://seungjunnah.github.io/Datasets/reds_vtsr)) dataset includes **~70 GB** data:
 
-- **Strong dynamics** with **nonlinear motion**.
-- Diverse scenes and locations.
-- Provides 15, 30, 60 fps videos for the same scene.
-- High-quality, 1280×720 (HD) resolution.
-- Stored in form of images (1 frame = 1 image).
+- 13,500 frames.
+- Shaking camera movements.
+- Outside environment and acivities.
 
-Example: E:\CoderSchool_Final_Project\REDS_VTSR\Media1.mp4
+-> Suitable for live streaming videos.
+
+[REDS_VTSR sample video](https://drive.google.com/file/d/1G0JDEubonHLVBaFFzYpaw-i_W7vas3w8/view?usp=sharing)
+
+### 2. Pexels:
+- 5,332 frames
+- Steady camera movements.
+- In-door environment and acivities.
+- Capture a lot of human faces.
+
+-> Suitable for video call.
+
+[Pexels sample video](https://drive.google.com/file/d/1VfPxkXx9auWXS9ACDDL6qvHHakQhvfo6/view?usp=sharing)
 
 ## Training:
 ### GAN model:
 **Model reference**: [Fast-SRGAN](https://github.com/HasnainRaz/Fast-SRGAN)
 
-**Input**: 180p videos.
+**Input**: 160x90p videos.
 
-- 240 training + 30 validation sequences provided (with ground-truth).
-- Tested on disjoint 30 sequences (no ground-truth provided).
+**Output**: 320x180p videos.
 
-**Output**: 720p videos.
+2x upscale.
 
-4 times upscale.
-
-![image](https://user-images.githubusercontent.com/71629218/99871806-f450ce00-2c0f-11eb-86af-073f6b5a9545.png)
+![image](https://user-images.githubusercontent.com/71629218/102676343-c8edde80-41cf-11eb-94d9-fc8c4cd44cfa.png)
 
 ## Production - Demo:
-Build on Flask app.
+**Pipeline**:
 
-Upscale real time video recording from webcam.
+1. Use OpenCV to turn input video frames into images.
+2. Input those images to Generator Model to generate high resolution images.
+3. Then, use OpenCV to turn high resolution images to a video for display.
 
-![image](https://user-images.githubusercontent.com/71629218/99871713-4ba26e80-2c0f-11eb-917f-b451a08aa4ea.png)
+![image](https://user-images.githubusercontent.com/71629218/102676363-e28f2600-41cf-11eb-89a8-5e26013ae649.png)
 
-**Video frames to images**:
-https://theailearner.com/2018/10/15/extracting-and-saving-video-frames-using-opencv-python/
-```
-import cv2
- 
-# Opens the Video file
-cap = cv2.VideoCapture(0) # Extracting frames from camera
-i=0
-while(cap.isOpened()):
-    ret, frame = cap.read()
-    if ret == False:
-        break
-    cv2.imwrite('kang'+str(i)+'.jpg',frame)
-    i+=1
- 
-cap.release()
-cv2.destroyAllWindows()
-```
+**Flask app**:
 
-**Images to video**:
-https://theailearner.com/2018/10/15/creating-video-from-images-using-opencv-python/
-```
-import cv2
- 
-# Opens the Video file
-import cv2
-import numpy as np
-import glob
+- Upscale a whole video via upload.
+- Upscale real time video recording from webcam.
 
-img_array = []
-for filename in glob.glob('C:/New folder/Images/*.jpg'):
-    img = cv2.imread(filename)
-    height, width, layers = img.shape
-    size = (width,height)
-    img_array.append(img)
-
-
-out = cv2.VideoWriter('project.avi',cv2.VideoWriter_fourcc(*'DIVX'), 15, size)
- 
-for i in range(len(img_array)):
-    out.write(img_array[i])
-out.release()
-```
+![image](https://user-images.githubusercontent.com/71629218/102676757-a78df200-41d1-11eb-9ad1-baf2d336a9c7.png)
