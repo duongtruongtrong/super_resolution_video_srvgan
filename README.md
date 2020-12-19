@@ -26,12 +26,14 @@ Comparison is between:
 - My model.
 - The real high resolution image.
 
-![comparision](https://user-images.githubusercontent.com/71629218/102676496-677a3f80-41d0-11eb-88fd-0f4a92f31a0d.png)
+![comparision](https://user-images.githubusercontent.com/71629218/102677121-76aebc80-41d3-11eb-8553-9b82060b9022.png)
 
-Image quality is acceptable.
+Image quality is better than Sony Vegas Pro and OpenCV, but still far away from real high resolution.
+
+Image quality of my model is acceptable.
 
 ### Speed:
-Not yet reach real time rendering speed.
+My model rendering time has not yet reached real time rendering speed.
 
 ![speed](https://user-images.githubusercontent.com/71629218/102676556-baec8d80-41d0-11eb-81e0-1a076e77a52f.png)
 
